@@ -1,5 +1,5 @@
 {
-  "name": "@hausdao/moloch-agent",
+  "name": "@raidguild/moloch-agent",
   "version": "0.1.0",
   "description": "CLI runtime for autonomous DAOhaus/Moloch agents.",
   "license": "MIT",

@@ -29,7 +29,7 @@ node dist/cli.js help
 Future package install:
 
 ```bash
-npm install -g @hausdao/moloch-agent
+npm install -g @raidguild/moloch-agent
 moloch-agent help
 ```
 
