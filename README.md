@@ -33,6 +33,37 @@ npm install -g @hausdao/moloch-agent
 moloch-agent help
 ```
 
+## Publish
+
+The package is published under the public `@hausdao` npm scope.
+
+One-time npm login:
+
+```bash
+npm login
+npm whoami
+```
+
+Verify package contents:
+
+```bash
+npm run typecheck
+npm test
+npm pack --dry-run
+```
+
+Publish:
+
+```bash
+npm publish --access public
+```
+
+If npm requires two-factor auth, pass the OTP from your authenticator:
+
+```bash
+npm publish --access public --otp 123456
+```
+
 ## Commands
 
 ```bash
@@ -52,4 +83,3 @@ moloch-agent pin-json --file community-state.json --name community-state-v1
 - The CLI will own local signing commands.
 - The service must never receive private keys.
 - Direct chain preflight is still required before transaction commands.
-

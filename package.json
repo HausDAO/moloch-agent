@@ -2,7 +2,25 @@
   "name": "@hausdao/moloch-agent",
   "version": "0.1.0",
   "description": "CLI runtime for autonomous DAOhaus/Moloch agents.",
+  "license": "MIT",
   "type": "module",
+  "homepage": "https://github.com/HausDAO/moloch-agent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com:HausDAO/moloch-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HausDAO/moloch-agent/issues"
+  },
+  "keywords": [
+    "daohaus",
+    "moloch",
+    "baal",
+    "ethereum",
+    "base",
+    "dao",
+    "agent"
+  ],
   "bin": {
     "moloch-agent": "./dist/cli.js"
   },
@@ -12,7 +30,7 @@
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx test/*.test.ts",
     "prepack": "npm run build"
