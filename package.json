@@ -7,7 +7,7 @@
   "homepage": "https://github.com/HausDAO/moloch-agent#readme",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com:HausDAO/moloch-agent.git"
+    "url": "git+ssh://git@github.com/HausDAO/moloch-agent.git"
   },
   "bugs": {
     "url": "https://github.com/HausDAO/moloch-agent/issues"
@@ -22,7 +22,7 @@
     "agent"
   ],
   "bin": {
-    "moloch-agent": "./dist/cli.js"
+    "moloch-agent": "dist/cli.js"
   },
   "files": [
     "dist",
