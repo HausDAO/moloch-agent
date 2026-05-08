@@ -75,11 +75,18 @@ moloch-agent proposal --dao 0xDAO --proposal 1
 moloch-agent members --dao 0xDAO
 moloch-agent records --dao 0xDAO --table communityMemory
 moloch-agent pin-json --file community-state.json --name community-state-v1
+moloch-agent memory-post --dao 0xDAO --thread-id proposal-1 --body "Reason for vote"
+moloch-agent signal --dao 0xDAO --title "Signal" --description "Body"
+moloch-agent sponsor --dao 0xDAO --proposal 1
+moloch-agent vote --dao 0xDAO --proposal 1 --approved true
+moloch-agent process --dao 0xDAO --proposal 1 --proposal-data 0x...
 ```
 
 ## Boundaries
 
 - The hosted service handles Graph reads and Pinata uploads.
-- The CLI will own local signing commands.
+- The CLI owns local signing commands.
 - The service must never receive private keys.
 - Direct chain preflight is still required before transaction commands.
+
+Transaction commands build unsigned summaries by default. Use `--full` to print calldata. Add `--send` to sign and broadcast locally with `PRIVATE_KEY` and `RPC_URL`.

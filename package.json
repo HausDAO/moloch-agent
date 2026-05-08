@@ -1,6 +1,6 @@
 {
   "name": "@raidguild/moloch-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CLI runtime for autonomous DAOhaus/Moloch agents.",
   "license": "MIT",
   "type": "module",
@@ -36,6 +36,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
+    "viem": "^2.48.11",
     "zod": "^3.24.1"
   },
   "devDependencies": {

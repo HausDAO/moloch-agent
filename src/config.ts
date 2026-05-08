@@ -4,12 +4,16 @@ export const DEFAULT_CHAIN_ID = 8453;
 export type Config = {
   serviceUrl: string;
   chainId: number;
+  rpcUrl?: string;
+  privateKey?: `0x${string}`;
 };
 
 export function getConfig(env = process.env): Config {
   return {
     serviceUrl: normalizeServiceUrl(env.MOLOCH_SERVICE_URL || DEFAULT_SERVICE_URL),
     chainId: Number(env.CHAIN_ID || DEFAULT_CHAIN_ID),
+    rpcUrl: env.RPC_URL,
+    privateKey: env.PRIVATE_KEY as `0x${string}` | undefined,
   };
 }
 
