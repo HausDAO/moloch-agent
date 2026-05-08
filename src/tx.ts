@@ -1,8 +1,12 @@
+import crypto from 'node:crypto';
 import {
+  encodeAbiParameters,
   createPublicClient,
   createWalletClient,
   encodeFunctionData,
   http,
+  parseAbiParameters,
+  parseUnits,
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -10,18 +14,48 @@ import { base } from 'viem/chains';
 import type { Config } from './config.js';
 
 export const POSTER = '0x000000000000cd17345801aa8147b8D3950260FF';
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+export const TRIBUTE_MINION = '0x00768B047f73D88b6e9c14bcA97221d6E179d468';
+export const GNOSIS_MULTISEND = '0x998739BFdAAdde7C933B942a68053933098f9EDa';
+export const SUMMONER = '0x97Aaa5be8B38795245f1c38A883B44cccdfB3E11';
 export const POSTER_TAG_DAO_DB = 'daohaus.proposal.database';
 export const POSTER_TAG_MEMBER_DB = 'daohaus.member.database';
+export const POSTER_TAG_DAO_PROFILE_UPDATE = 'daohaus.shares.daoProfile';
+export const POSTER_TAG_SUMMONER = 'daohaus.summoner.daoProfile';
+export const BAAL_TOKEN_DECIMALS = 18;
 
 export const BAAL_ABI = [
   { type: 'function', name: 'submitProposal', stateMutability: 'payable', inputs: [{ name: 'proposalData', type: 'bytes' }, { name: 'expiration', type: 'uint32' }, { name: 'baalGas', type: 'uint256' }, { name: 'details', type: 'string' }], outputs: [] },
   { type: 'function', name: 'sponsorProposal', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }], outputs: [] },
   { type: 'function', name: 'submitVote', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }, { name: 'approved', type: 'bool' }], outputs: [] },
   { type: 'function', name: 'processProposal', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }, { name: 'proposalData', type: 'bytes' }], outputs: [] },
+  { type: 'function', name: 'mintShares', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address[]' }, { name: 'amount', type: 'uint256[]' }], outputs: [] },
+  { type: 'function', name: 'setGovernanceConfig', stateMutability: 'nonpayable', inputs: [{ name: '_governanceConfig', type: 'bytes' }], outputs: [] },
+  { type: 'function', name: 'setShamans', stateMutability: 'nonpayable', inputs: [{ name: '_shamans', type: 'address[]' }, { name: '_permissions', type: 'uint256[]' }], outputs: [] },
+  { type: 'function', name: 'executeAsBaal', stateMutability: 'nonpayable', inputs: [{ name: '_to', type: 'address' }, { name: '_value', type: 'uint256' }, { name: '_data', type: 'bytes' }], outputs: [] },
+  { type: 'function', name: 'proposalCount', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  { type: 'function', name: 'proposalOffering', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'sponsorThreshold', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'latestSponsoredProposalId', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
+  { type: 'function', name: 'getProposalStatus', stateMutability: 'view', inputs: [{ name: 'id', type: 'uint32' }], outputs: [{ type: 'bool[4]' }] },
+  { type: 'function', name: 'state', stateMutability: 'view', inputs: [{ name: 'id', type: 'uint32' }], outputs: [{ type: 'uint8' }] },
+  { type: 'function', name: 'proposals', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ name: 'id', type: 'uint32' }, { name: 'prevProposalId', type: 'uint32' }, { name: 'votingStarts', type: 'uint32' }, { name: 'votingEnds', type: 'uint32' }, { name: 'graceEnds', type: 'uint32' }, { name: 'expiration', type: 'uint32' }, { name: 'baalGas', type: 'uint256' }, { name: 'yesVotes', type: 'uint256' }, { name: 'noVotes', type: 'uint256' }, { name: 'maxTotalSharesAndLootAtVote', type: 'uint256' }, { name: 'maxTotalSharesAtSponsor', type: 'uint256' }, { name: 'sponsor', type: 'address' }, { name: 'proposalDataHash', type: 'bytes32' }] },
 ] as const;
 
 export const POSTER_ABI = [
   { type: 'function', name: 'post', stateMutability: 'nonpayable', inputs: [{ name: 'content', type: 'string' }, { name: 'tag', type: 'string' }], outputs: [] },
+] as const;
+
+const MULTISEND_ABI = [
+  { type: 'function', name: 'multiSend', stateMutability: 'payable', inputs: [{ name: 'transactions', type: 'bytes' }], outputs: [] },
+] as const;
+
+const TRIBUTE_MINION_ABI = [
+  { type: 'function', name: 'submitTributeProposal', stateMutability: 'payable', inputs: [{ name: 'baal', type: 'address' }, { name: 'token', type: 'address' }, { name: 'amount', type: 'uint256' }, { name: 'shares', type: 'uint256' }, { name: 'loot', type: 'uint256' }, { name: 'expiration', type: 'uint32' }, { name: 'baalgas', type: 'uint256' }, { name: 'details', type: 'string' }], outputs: [] },
+] as const;
+
+const SUMMONER_ABI = [
+  { type: 'function', name: 'summonBaalFromReferrer', stateMutability: 'nonpayable', inputs: [{ name: '_safeAddr', type: 'address' }, { name: '_forwarderAddr', type: 'address' }, { name: '_saltNonce', type: 'uint256' }, { name: 'initializationMintParams', type: 'bytes' }, { name: 'initializationTokenParams', type: 'bytes' }, { name: 'postInitializationActions', type: 'bytes[]' }], outputs: [] },
 ] as const;
 
 export type UnsignedTx = {
@@ -29,6 +63,7 @@ export type UnsignedTx = {
   to: `0x${string}`;
   value: string;
   data: Hex;
+  gas?: string;
 };
 
 export type BuiltTx = {
@@ -39,6 +74,42 @@ export type BuiltTx = {
 export type SendResult = BuiltTx & {
   sent: true;
   hash: Hex;
+};
+
+export type SummonParams = {
+  daoName: string;
+  description?: string;
+  longDescription?: string;
+  avatarImg?: string;
+  bannerImg?: string;
+  links?: unknown;
+  goalsURI?: string;
+  charterURI?: string;
+  joinRulesURI?: string;
+  rulesURI?: string;
+  manifestoURI?: string;
+  communityMemoryURI?: string;
+  proposalWorkspaceURI?: string;
+  sharedStateURI?: string;
+  memberAddresses: `0x${string}`[];
+  memberShares: Array<string | number | bigint>;
+  memberLoot?: Array<string | number | bigint>;
+  tokenName: string;
+  tokenSymbol: string;
+  lootTokenName: string;
+  lootTokenSymbol: string;
+  votingTransferable?: boolean;
+  nvTransferable?: boolean;
+  votingPeriodInSeconds: number;
+  gracePeriodInSeconds: number;
+  newOffering?: string | number | bigint;
+  quorum: string | number | bigint;
+  sponsorThreshold: string | number | bigint;
+  minRetention: string | number | bigint;
+  shamanAddresses?: `0x${string}`[];
+  shamanPermissions?: Array<string | number | bigint>;
+  safeAddress?: `0x${string}`;
+  saltNonce?: string | number | bigint;
 };
 
 export function buildVoteTx(input: { chainId: number; dao: `0x${string}`; proposal: number; approved: boolean }): BuiltTx {
@@ -68,16 +139,17 @@ export function buildSponsorTx(input: { chainId: number; dao: `0x${string}`; pro
   });
 }
 
-export function buildProcessTx(input: { chainId: number; dao: `0x${string}`; proposal: number; proposalData: Hex }): BuiltTx {
+export function buildProcessTx(input: { chainId: number; dao: `0x${string}`; proposal: number; proposalData: Hex; gasLimit?: bigint }): BuiltTx {
   const data = encodeFunctionData({
     abi: BAAL_ABI,
     functionName: 'processProposal',
     args: [input.proposal, input.proposalData],
   });
-  return withSummary(tx(input.chainId, input.dao, data), {
+  return withSummary(tx(input.chainId, input.dao, data, 0n, input.gasLimit), {
     action: 'process',
     dao: input.dao,
     proposalId: input.proposal,
+    gasLimit: input.gasLimit?.toString(),
     note: 'Use exact indexed proposalData. Processing is mechanical settlement after governance is complete.',
   });
 }
@@ -165,30 +237,403 @@ export function buildSignalTx(input: {
       POSTER_TAG_DAO_DB,
     ],
   });
-  const proposalData = encodeFunctionData({
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions: [{ to: POSTER, value: 0n, data: postData, operation: 0 }],
+    title: input.title,
+    description: input.description,
+    link: input.link,
+    proposalType: 'SIGNAL',
+    expiration: input.expiration,
+    baalGas: input.baalGas,
+    value: input.proposalOffering,
+    summary: {
+      action: 'submitProposal',
+      proposalKind: 'SIGNAL',
+      dao: input.dao,
+      title: input.title,
+      contentURI: input.link || '',
+    },
+  });
+}
+
+export function buildDaoMetaTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  title?: string;
+  description?: string;
+  link?: string;
+  name?: string;
+  daoDescription?: string;
+  communityMemoryURI?: string;
+  proposalWorkspaceURI?: string;
+  sharedStateURI?: string;
+  web?: string;
+  expiration?: number;
+  baalGas?: bigint;
+  proposalOffering?: bigint;
+}): BuiltTx {
+  const content = compactObject({
+    daoId: input.dao,
+    table: 'daoProfile',
+    queryType: 'list',
+    name: input.name,
+    description: input.daoDescription,
+    communityMemoryURI: input.communityMemoryURI,
+    proposalWorkspaceURI: input.proposalWorkspaceURI,
+    sharedStateURI: input.sharedStateURI,
+    web: input.web,
+    updatedAt: new Date().toISOString(),
+  });
+  const postData = encodeFunctionData({
+    abi: POSTER_ABI,
+    functionName: 'post',
+    args: [JSON.stringify(content), POSTER_TAG_DAO_PROFILE_UPDATE],
+  });
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions: [{ to: POSTER, value: 0n, data: postData, operation: 0 }],
+    title: input.title || 'Update DAO metadata',
+    description: input.description || '',
+    link: input.link,
+    proposalType: 'UPDATE_METADATA_SETTINGS',
+    expiration: input.expiration,
+    baalGas: input.baalGas,
+    value: input.proposalOffering,
+    summary: {
+      action: 'submitProposal',
+      proposalKind: 'UPDATE_METADATA_SETTINGS',
+      dao: input.dao,
+      recordTable: 'daoProfile',
+      contentURI: input.link || '',
+    },
+  });
+}
+
+export function buildTributeTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  title?: string;
+  description?: string;
+  link?: string;
+  token?: string;
+  amount?: bigint;
+  shares?: bigint;
+  loot?: bigint;
+  expiration?: number;
+  baalGas?: bigint;
+}): BuiltTx {
+  const title = input.title || 'Tribute for DAO tokens';
+  const description = input.description || '';
+  const link = input.link || '';
+  const token = normalizeToken(input.token || 'ETH');
+  const amount = input.amount || 0n;
+  const shares = input.shares || 0n;
+  const loot = input.loot || 0n;
+  const value = token === ZERO_ADDRESS ? amount : 0n;
+  const data = encodeFunctionData({
+    abi: TRIBUTE_MINION_ABI,
+    functionName: 'submitTributeProposal',
+    args: [input.dao, token, amount, shares, loot, input.expiration || 0, input.baalGas || 0n, details({ title, description, link, proposalType: 'TOKENS_FOR_SHARES' })],
+  });
+  return withSummary(tx(input.chainId, TRIBUTE_MINION, data, value), {
+    action: 'submitTributeProposal',
+    dao: input.dao,
+    proposalKind: 'TOKENS_FOR_SHARES',
+    submissionTarget: 'TRIBUTE_MINION',
+    token,
+    amount: amount.toString(),
+    shares: shares.toString(),
+    loot: loot.toString(),
+    note: token === ZERO_ADDRESS
+      ? 'Native ETH tribute. Transaction value equals amount. Shares/loot use 18-decimal base units.'
+      : 'ERC-20 tribute. Approve the Tribute Minion first if allowance is insufficient. Shares/loot use 18-decimal base units.',
+  });
+}
+
+export function buildMintSharesTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  recipients: `0x${string}`[];
+  amounts: bigint[];
+  title?: string;
+  description?: string;
+  link?: string;
+  expiration?: number;
+  baalGas?: bigint;
+  proposalOffering?: bigint;
+}): BuiltTx {
+  if (!input.recipients.length) throw new Error('Missing recipient address.');
+  if (input.recipients.length !== input.amounts.length) throw new Error('Recipients and amounts must have the same length.');
+  const action = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'mintShares',
+    args: [input.recipients, input.amounts],
+  });
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions: [{ to: input.dao, value: 0n, data: action, operation: 0 }],
+    title: input.title || 'Mint voting shares',
+    description: input.description || '',
+    link: input.link,
+    proposalType: 'MINT_SHARES',
+    expiration: input.expiration,
+    baalGas: input.baalGas,
+    value: input.proposalOffering,
+    summary: {
+      action: 'submitProposal',
+      proposalKind: 'MINT_SHARES',
+      dao: input.dao,
+      recipients: input.recipients,
+      amounts: input.amounts.map(String),
+      note: '--amount uses human 18-decimal share units; use --amount-raw for exact base units.',
+    },
+  });
+}
+
+export function buildSummonTx(input: {
+  chainId: number;
+  params: SummonParams;
+}): BuiltTx {
+  const params = normalizeSummonParams(input.params);
+  const mint = encodeValues(
+    ['address[]', 'uint256[]', 'uint256[]'],
+    [params.memberAddresses, params.memberShares, params.memberLoot],
+  );
+  const tokens = encodeValues(
+    ['string', 'string', 'string', 'string', 'bool', 'bool'],
+    [
+      params.tokenName,
+      params.tokenSymbol,
+      params.lootTokenName,
+      params.lootTokenSymbol,
+      Boolean(params.votingTransferable),
+      Boolean(params.nvTransferable),
+    ],
+  );
+  const gov = encodeValues(
+    ['uint32', 'uint32', 'uint256', 'uint256', 'uint256', 'uint256'],
+    [
+      params.votingPeriodInSeconds,
+      params.gracePeriodInSeconds,
+      params.newOffering,
+      rawPercent('quorum', params.quorum),
+      params.sponsorThreshold,
+      rawPercent('minRetention', params.minRetention),
+    ],
+  );
+  const govTx = encodeFunctionData({ abi: BAAL_ABI, functionName: 'setGovernanceConfig', args: [gov] });
+  const shamanTx = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'setShamans',
+    args: [params.shamanAddresses, params.shamanPermissions],
+  });
+  const metadataPost = encodeFunctionData({
+    abi: POSTER_ABI,
+    functionName: 'post',
+    args: [JSON.stringify(summonProfile(params)), POSTER_TAG_SUMMONER],
+  });
+  const metadataTx = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'executeAsBaal',
+    args: [POSTER, 0n, metadataPost],
+  });
+  const saltNonce = params.saltNonce || BigInt(`0x${crypto.randomBytes(16).toString('hex')}`);
+  const data = encodeFunctionData({
+    abi: SUMMONER_ABI,
+    functionName: 'summonBaalFromReferrer',
+    args: [params.safeAddress || ZERO_ADDRESS, ZERO_ADDRESS, saltNonce, mint, tokens, [govTx, shamanTx, metadataTx]],
+  });
+  return withSummary(tx(input.chainId, SUMMONER, data), {
+    action: 'summonBaalFromReferrer',
+    proposalKind: 'SUMMON',
+    submissionTarget: 'V3_FACTORY_ADV_TOKEN',
+    daoName: params.daoName,
+    tokenSymbol: params.tokenSymbol,
+    lootTokenSymbol: params.lootTokenSymbol,
+    members: params.memberAddresses.length,
+    votingPeriodInSeconds: params.votingPeriodInSeconds,
+    gracePeriodInSeconds: params.gracePeriodInSeconds,
+    quorum: params.quorum.toString(),
+    sponsorThreshold: params.sponsorThreshold.toString(),
+    minRetention: params.minRetention.toString(),
+    saltNonce: saltNonce.toString(),
+    metadataIncluded: true,
+    communityMemoryURI: params.communityMemoryURI,
+    proposalWorkspaceURI: params.proposalWorkspaceURI,
+    sharedStateURI: params.sharedStateURI,
+  });
+}
+
+export function parseBaalTokenUnits(value: string): bigint {
+  const normalized = value.trim();
+  if (!/^\d+(\.\d+)?$/.test(normalized)) throw new Error('Token amount must be a non-negative decimal number.');
+  return parseUnits(normalized, BAAL_TOKEN_DECIMALS);
+}
+
+export function parseBigint(value: string): bigint {
+  if (!/^\d+$/.test(value)) throw new Error('Expected a non-negative integer.');
+  return BigInt(value);
+}
+
+export function normalizeToken(value: string): `0x${string}` {
+  if (!value || value.toUpperCase() === 'ETH' || value.toUpperCase() === 'NATIVE') return ZERO_ADDRESS;
+  return asAddress(value);
+}
+
+function buildProposalTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  actions: Action[];
+  title: string;
+  description: string;
+  link?: string;
+  proposalType: string;
+  expiration?: number;
+  baalGas?: bigint;
+  value?: bigint;
+  summary: Record<string, unknown>;
+}): BuiltTx {
+  const proposalData = encodeMultiAction(input.actions);
+  const resolvedBaalGas = input.baalGas || 0n;
+  const data = encodeFunctionData({
     abi: BAAL_ABI,
     functionName: 'submitProposal',
     args: [
-      postData,
+      proposalData,
       input.expiration || 0,
-      input.baalGas || 0n,
-      JSON.stringify({
+      resolvedBaalGas,
+      details({
         title: input.title,
         description: input.description,
-        contentURI: input.link || '',
-        contentURIType: input.link ? 'url' : '',
-        proposalType: 'SIGNAL',
+        link: input.link || '',
+        proposalType: input.proposalType,
       }),
     ],
   });
-  return withSummary(tx(input.chainId, input.dao, proposalData, input.proposalOffering || 0n), {
-    action: 'signal',
-    dao: input.dao,
-    proposalKind: 'SIGNAL',
-    title: input.title,
-    contentURI: input.link || '',
-    baalGas: String(input.baalGas || 0n),
+  return withSummary(tx(input.chainId, input.dao, data, input.value || 0n), {
+    submissionTarget: 'BAAL',
+    baalGas: resolvedBaalGas.toString(),
+    ...input.summary,
+    proposalData,
   });
+}
+
+type Action = {
+  operation: number;
+  to: `0x${string}`;
+  value: bigint;
+  data: Hex;
+};
+
+function encodeMultiAction(actions: Action[]): Hex {
+  return encodeFunctionData({
+    abi: MULTISEND_ABI,
+    functionName: 'multiSend',
+    args: [encodeMultiSend(actions)],
+  });
+}
+
+function encodeMultiSend(actions: Action[]): Hex {
+  const packed = actions.map((action) => {
+    const op = Number(action.operation || 0).toString(16).padStart(2, '0');
+    const to = action.to.toLowerCase().replace(/^0x/, '').padStart(40, '0');
+    const value = BigInt(action.value || 0n).toString(16).padStart(64, '0');
+    const data = (action.data || '0x').replace(/^0x/, '');
+    const len = (data.length / 2).toString(16).padStart(64, '0');
+    return `${op}${to}${value}${len}${data}`;
+  }).join('');
+  return `0x${packed}`;
+}
+
+function details(input: { title: string; description: string; link: string; proposalType: string }): string {
+  return JSON.stringify({
+    title: input.title,
+    description: input.description,
+    contentURI: input.link,
+    contentURIType: input.link ? 'url' : '',
+    proposalType: input.proposalType,
+  });
+}
+
+function encodeValues(types: string[], values: unknown[]): Hex {
+  return encodeAbiParameters(parseAbiParameters(types.join(',')), values);
+}
+
+function rawPercent(name: string, value: string | number | bigint): bigint {
+  const normalized = String(value).trim().replace(/%$/, '');
+  if (normalized.includes('.')) throw new Error(`${name} must be a whole-number percent from 0 to 100.`);
+  const percent = BigInt(normalized);
+  if (percent < 0n || percent > 100n) throw new Error(`${name} must be a whole-number percent from 0 to 100.`);
+  return percent;
+}
+
+function normalizeSummonParams(params: SummonParams): Required<Pick<SummonParams,
+  'daoName' |
+  'memberAddresses' |
+  'tokenName' |
+  'tokenSymbol' |
+  'lootTokenName' |
+  'lootTokenSymbol' |
+  'votingPeriodInSeconds' |
+  'gracePeriodInSeconds'
+>> & Omit<SummonParams, 'memberShares' | 'memberLoot' | 'newOffering' | 'sponsorThreshold' | 'shamanAddresses' | 'shamanPermissions' | 'saltNonce'> & {
+  memberShares: bigint[];
+  memberLoot: bigint[];
+  newOffering: bigint;
+  sponsorThreshold: bigint;
+  shamanAddresses: `0x${string}`[];
+  shamanPermissions: bigint[];
+  saltNonce?: bigint;
+} {
+  if (!params.daoName) throw new Error('Summon params require daoName.');
+  if (!params.memberAddresses?.length) throw new Error('Summon params require memberAddresses.');
+  if (!params.memberShares?.length) throw new Error('Summon params require memberShares.');
+  if (params.memberAddresses.length !== params.memberShares.length) throw new Error('memberAddresses and memberShares must have the same length.');
+  const memberLoot = params.memberLoot || params.memberAddresses.map(() => 0);
+  if (memberLoot.length !== params.memberAddresses.length) throw new Error('memberLoot must match memberAddresses length.');
+  if (!params.tokenName || !params.tokenSymbol || !params.lootTokenName || !params.lootTokenSymbol) {
+    throw new Error('Summon params require tokenName, tokenSymbol, lootTokenName, and lootTokenSymbol.');
+  }
+  return {
+    ...params,
+    memberAddresses: params.memberAddresses.map(asAddress),
+    memberShares: params.memberShares.map(toBigint),
+    memberLoot: memberLoot.map(toBigint),
+    newOffering: toBigint(params.newOffering || 0),
+    sponsorThreshold: toBigint(params.sponsorThreshold),
+    shamanAddresses: (params.shamanAddresses || []).map(asAddress),
+    shamanPermissions: (params.shamanPermissions || []).map(toBigint),
+    safeAddress: params.safeAddress ? asAddress(params.safeAddress) : undefined,
+    saltNonce: params.saltNonce == null ? undefined : toBigint(params.saltNonce),
+  };
+}
+
+function summonProfile(params: SummonParams): Record<string, unknown> {
+  return compactObject({
+    name: params.daoName,
+    description: params.description,
+    longDescription: params.longDescription,
+    avatarImg: params.avatarImg,
+    bannerImg: params.bannerImg,
+    links: params.links,
+    goalsURI: params.goalsURI,
+    charterURI: params.charterURI,
+    joinRulesURI: params.joinRulesURI,
+    rulesURI: params.rulesURI,
+    manifestoURI: params.manifestoURI,
+    communityMemoryURI: params.communityMemoryURI,
+    proposalWorkspaceURI: params.proposalWorkspaceURI,
+    sharedStateURI: params.sharedStateURI,
+  });
+}
+
+function toBigint(value: string | number | bigint | undefined): bigint {
+  if (value == null) throw new Error('Expected integer value.');
+  return BigInt(value);
 }
 
 export async function maybeSend(config: Config, built: BuiltTx, send: boolean): Promise<BuiltTx | SendResult> {
@@ -205,6 +650,7 @@ export async function maybeSend(config: Config, built: BuiltTx, send: boolean): 
     to: built.tx.to,
     value: BigInt(built.tx.value),
     data: built.tx.data,
+    gas: built.tx.gas ? BigInt(built.tx.gas) : undefined,
   });
   const hash = await walletClient.sendTransaction(request);
   return { ...built, sent: true, hash };
@@ -226,8 +672,8 @@ export function asProposalId(value: string): number {
   return parsed;
 }
 
-function tx(chainId: number, to: `0x${string}`, data: Hex, value = 0n): UnsignedTx {
-  return { chainId, to, value: value.toString(), data };
+function tx(chainId: number, to: `0x${string}`, data: Hex, value = 0n, gas?: bigint): UnsignedTx {
+  return { chainId, to, value: value.toString(), data, gas: gas?.toString() };
 }
 
 function withSummary(txObject: UnsignedTx, summary: Record<string, unknown>): BuiltTx {

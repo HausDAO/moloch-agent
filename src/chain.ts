@@ -1,0 +1,343 @@
+import { createPublicClient, http } from 'viem';
+import { base } from 'viem/chains';
+import type { Config } from './config.js';
+import type { ServiceClient } from './service.js';
+import { BAAL_ABI, type BuiltTx } from './tx.js';
+import { buildProcessTx } from './tx.js';
+
+export const STATE_NAMES = ['unborn', 'submitted', 'voting', 'cancelled', 'grace', 'ready', 'processed', 'defeated'];
+const PREV_PROCESS_ELIGIBLE = new Set([0, 3, 6, 7]);
+const PROCESS_PROPOSAL_GAS_LIMIT_ADDITION = 400000n;
+const DEFAULT_PROCESS_GAS_LIMIT = 800000n;
+
+export async function readDaoDirect(config: Config, dao: `0x${string}`): Promise<Record<string, unknown>> {
+  const client = publicClient(config);
+  const [proposalCount, proposalOffering, sponsorThreshold, latestSponsoredProposalId] = await Promise.all([
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'proposalCount' }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'proposalOffering' }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'sponsorThreshold' }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'latestSponsoredProposalId' }),
+  ]);
+  return {
+    dao,
+    proposalCount: proposalCount.toString(),
+    proposalOffering: proposalOffering.toString(),
+    sponsorThreshold: sponsorThreshold.toString(),
+    latestSponsoredProposalId: latestSponsoredProposalId.toString(),
+  };
+}
+
+export async function readProposalDirect(config: Config, dao: `0x${string}`, proposal: number): Promise<Record<string, unknown>> {
+  const client = publicClient(config);
+  const [raw, status, state] = await Promise.all([
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'proposals', args: [BigInt(proposal)] }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'getProposalStatus', args: [proposal] }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'state', args: [proposal] }),
+  ]);
+  return {
+    dao,
+    proposal,
+    raw: namedProposalTuple(raw),
+    status: namedProposalStatus(status),
+    state: Number(state),
+    stateName: STATE_NAMES[Number(state)] || `unknown-${state}`,
+  };
+}
+
+export async function proposalLifecycle(input: {
+  config: Config;
+  service: ServiceClient;
+  dao: `0x${string}`;
+  proposal: number;
+}): Promise<Record<string, unknown>> {
+  const indexed = await input.service.proposal({ dao: input.dao, proposal: String(input.proposal) });
+  const proposal = extractProposal(indexed);
+  if (!proposal) throw new Error(`Proposal ${input.proposal} not found.`);
+  let chain: Record<string, unknown> = {};
+  if (input.config.rpcUrl) {
+    try {
+      chain = await chainProposalContext(input.config, input.dao, proposal);
+    } catch (error) {
+      chain = { error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  return {
+    proposal: compactProposal(proposal),
+    lifecycle: deriveProposalLifecycle(proposal, Math.floor(Date.now() / 1000), chain),
+    chain,
+  };
+}
+
+export async function processQueue(input: {
+  config: Config;
+  service: ServiceClient;
+  dao: `0x${string}`;
+  first: number;
+}): Promise<Record<string, unknown>> {
+  const indexed = await input.service.proposals({ dao: input.dao, first: input.first, skip: 0 });
+  const proposals = extractProposals(indexed);
+  const candidates = proposals
+    .filter((proposal) => (
+      proposal.proposalId != null &&
+      Number(proposal.graceEnds || 0) < Math.floor(Date.now() / 1000) &&
+      Boolean(proposal.proposalData) &&
+      !Boolean(proposal.cancelled) &&
+      !Boolean(proposal.processed)
+    ));
+
+  if (!input.config.rpcUrl) {
+    return {
+      dao: input.dao,
+      queue: candidates
+        .sort((a, b) => Number(a.proposalId) - Number(b.proposalId))
+        .map((proposal, index) => ({
+          ...queueItem(proposal, deriveProposalLifecycle(proposal)),
+          queueIndex: index,
+          processFirst: index === 0,
+          status: 'needsChainPreflight',
+          note: 'Set RPC_URL to verify direct chain processability.',
+        })),
+    };
+  }
+
+  const checked = await Promise.all(candidates.map(async (proposal) => {
+    try {
+      const chain = await chainProposalContext(input.config, input.dao, proposal);
+      return { proposal, lifecycle: deriveProposalLifecycle(proposal, Math.floor(Date.now() / 1000), chain), chain };
+    } catch (error) {
+      return {
+        proposal,
+        lifecycle: {
+          status: 'chainPreflightError',
+          processableNow: false,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+  }));
+
+  const queue = checked
+    .filter((item) => item.lifecycle.processableNow)
+    .sort((a, b) => Number(a.proposal.proposalId) - Number(b.proposal.proposalId))
+    .map((item, index) => ({ ...queueItem(item.proposal, item.lifecycle), queueIndex: index, processFirst: index === 0 }));
+
+  return { dao: input.dao, queue };
+}
+
+export async function buildOldestReadyProcessTx(input: {
+  config: Config;
+  service: ServiceClient;
+  chainId: number;
+  dao: `0x${string}`;
+  first: number;
+}): Promise<BuiltTx> {
+  const result = await processQueue(input);
+  const queue = Array.isArray(result.queue) ? result.queue : [];
+  const oldest = queue.find((item): item is { proposalId: string; proposalData: `0x${string}`; processGasLimit: string } => (
+    typeof item === 'object' &&
+    item !== null &&
+    'processFirst' in item &&
+    Boolean(item.processFirst) &&
+    'proposalData' in item &&
+    typeof item.proposalData === 'string'
+  ));
+  if (!oldest) throw new Error('No ready-to-process proposal found.');
+  return buildProcessTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    proposal: Number(oldest.proposalId),
+    proposalData: oldest.proposalData,
+    gasLimit: BigInt(oldest.processGasLimit || DEFAULT_PROCESS_GAS_LIMIT),
+  });
+}
+
+function publicClient(config: Config) {
+  if (!config.rpcUrl) throw new Error('RPC_URL is required for direct chain reads.');
+  if (config.chainId !== 8453) throw new Error('Only Base chainId 8453 is currently supported for direct chain reads.');
+  return createPublicClient({ chain: base, transport: http(config.rpcUrl) });
+}
+
+async function chainProposalContext(config: Config, dao: `0x${string}`, proposal: IndexedProposal): Promise<Record<string, unknown>> {
+  const client = publicClient(config);
+  const id = Number(proposal.proposalId);
+  const prevId = Number(proposal.prevProposalId || 0);
+  const [rawStatus, state, prevState, raw] = await Promise.all([
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'getProposalStatus', args: [id] }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'state', args: [id] }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'state', args: [prevId] }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'proposals', args: [BigInt(id)] }),
+  ]);
+  const tuple = namedProposalTuple(raw);
+  const baalGas = BigInt(tuple.baalGas || '0');
+  return {
+    namedStatus: namedProposalStatus(rawStatus),
+    state: Number(state),
+    prevState: Number(prevState),
+    proposal: tuple,
+    processGasLimit: (baalGas > 0n ? baalGas + PROCESS_PROPOSAL_GAS_LIMIT_ADDITION : DEFAULT_PROCESS_GAS_LIMIT).toString(),
+  };
+}
+
+function deriveProposalLifecycle(proposal: IndexedProposal, now = Math.floor(Date.now() / 1000), chain: Record<string, unknown> = {}) {
+  const sponsored = Boolean(proposal.sponsored);
+  const chainStatus = isRecord(chain.namedStatus) ? chain.namedStatus : {};
+  const hasChainStatus = Array.isArray(chainStatus.raw);
+  const cancelled = hasChainStatus ? Boolean(chainStatus.cancelled) : Boolean(proposal.cancelled);
+  const processed = hasChainStatus ? Boolean(chainStatus.processed) : Boolean(proposal.processed);
+  const passed = hasChainStatus ? Boolean(chainStatus.passed) : Boolean(proposal.passed);
+  const actionFailed = hasChainStatus ? Boolean(chainStatus.actionFailed) : Boolean(proposal.actionFailed);
+  const votingStarts = Number(proposal.votingStarts || 0);
+  const votingEnds = Number(proposal.votingEnds || 0);
+  const graceEnds = Number(proposal.graceEnds || 0);
+  const yes = BigInt(String(proposal.yesBalance || proposal.yesVotes || '0'));
+  const no = BigInt(String(proposal.noBalance || proposal.noVotes || '0'));
+  const quorum = hasQuorum(proposal);
+  const afterGrace = sponsored && !cancelled && !processed && now > graceEnds;
+  const needsSponsor = !sponsored && !cancelled;
+  const inVoting = sponsored && !cancelled && !processed && votingStarts < now && votingEnds > now;
+  const inGrace = sponsored && !cancelled && !processed && votingEnds < now && graceEnds > now;
+  const graphReady = afterGrace && yes > no && quorum;
+  const prevState = typeof chain.prevState === 'number' ? chain.prevState : undefined;
+  const state = typeof chain.state === 'number' ? chain.state : undefined;
+  const prevStateEligible = prevState == null ? undefined : PREV_PROCESS_ELIGIBLE.has(prevState);
+  const stateReady = state == null ? undefined : state === 5;
+  const stateDefeated = state == null ? undefined : state === 7;
+  const failedQuorum = afterGrace && state == null && !quorum;
+  const failedVote = afterGrace && (stateDefeated == null ? yes <= no : stateDefeated);
+  const processableNow = Boolean((stateReady == null ? graphReady : stateReady) && proposal.proposalData && prevStateEligible !== false);
+
+  let status = 'unknown';
+  if (needsSponsor) status = 'unsponsored';
+  if (cancelled) status = 'cancelled';
+  else if (actionFailed) status = 'actionFailed';
+  else if (processed && passed) status = 'processedPassed';
+  else if (processed && !passed) status = 'processedFailed';
+  else if (inVoting) status = 'voting';
+  else if (inGrace) status = 'grace';
+  else if (processableNow) status = 'needsProcessing';
+  else if (stateDefeated || failedQuorum || failedVote) status = 'failed';
+
+  return {
+    proposalId: String(proposal.proposalId ?? ''),
+    status,
+    needsSponsor,
+    needsVote: inVoting,
+    inVoting,
+    inGrace,
+    graphReady,
+    chainReady: stateReady,
+    processableNow,
+    failedQuorum,
+    failedVote,
+    processed,
+    passed,
+    actionFailed,
+    hasProposalData: Boolean(proposal.proposalData),
+    chainState: state == null ? undefined : STATE_NAMES[state] || `unknown-${state}`,
+    prevProposalId: String(proposal.prevProposalId ?? ''),
+    prevState: prevState == null ? undefined : STATE_NAMES[prevState] || `unknown-${prevState}`,
+    prevStateEligible,
+    processGasLimit: typeof chain.processGasLimit === 'string' ? chain.processGasLimit : undefined,
+  };
+}
+
+function queueItem(proposal: IndexedProposal, lifecycle: Record<string, unknown>) {
+  return {
+    proposalId: String(proposal.proposalId),
+    title: proposal.title,
+    proposalType: proposal.proposalType,
+    prevProposalId: proposal.prevProposalId,
+    status: lifecycle.status,
+    chainReady: lifecycle.chainReady,
+    processableNow: lifecycle.processableNow,
+    previousProposalProcessed: lifecycle.prevStateEligible,
+    indexedPassed: Boolean(proposal.passed),
+    indexedProcessed: Boolean(proposal.processed),
+    indexedCancelled: Boolean(proposal.cancelled),
+    proposalData: proposal.proposalData,
+    processGasLimit: isRecord(lifecycle) && typeof lifecycle.processGasLimit === 'string' ? lifecycle.processGasLimit : undefined,
+  };
+}
+
+function hasQuorum(proposal: IndexedProposal): boolean {
+  const totalShares = BigInt(String(proposal.dao?.totalShares || '0'));
+  const quorumPercent = BigInt(String(proposal.dao?.quorumPercent || '0'));
+  const yes = BigInt(String(proposal.yesBalance || proposal.yesVotes || '0'));
+  if (totalShares === 0n) return false;
+  return yes * 100n >= quorumPercent * totalShares;
+}
+
+function namedProposalStatus(status: readonly boolean[]): Record<string, unknown> {
+  const values = Array.from(status || []);
+  return {
+    cancelled: Boolean(values[0]),
+    processed: Boolean(values[1]),
+    passed: Boolean(values[2]),
+    actionFailed: Boolean(values[3]),
+    raw: values.map(Boolean),
+  };
+}
+
+function namedProposalTuple(raw: readonly unknown[]): Record<string, string> {
+  const names = ['id', 'prevProposalId', 'votingStarts', 'votingEnds', 'graceEnds', 'expiration', 'baalGas', 'yesVotes', 'noVotes', 'maxTotalSharesAndLootAtVote', 'maxTotalSharesAtSponsor', 'sponsor', 'proposalDataHash'];
+  return Object.fromEntries(names.map((name, index) => [name, stringifyValue(raw[index])]));
+}
+
+function stringifyValue(value: unknown): string {
+  return typeof value === 'bigint' ? value.toString() : String(value);
+}
+
+function extractProposal(value: unknown): IndexedProposal | undefined {
+  if (isRecord(value) && isRecord(value.proposal)) return value.proposal as IndexedProposal;
+  return undefined;
+}
+
+function extractProposals(value: unknown): IndexedProposal[] {
+  if (isRecord(value) && Array.isArray(value.proposals)) return value.proposals as IndexedProposal[];
+  return [];
+}
+
+function compactProposal(proposal: IndexedProposal) {
+  return {
+    id: proposal.id,
+    proposalId: proposal.proposalId,
+    title: proposal.title,
+    proposalType: proposal.proposalType,
+    sponsored: proposal.sponsored,
+    processed: proposal.processed,
+    cancelled: proposal.cancelled,
+    passed: proposal.passed,
+    votingStarts: proposal.votingStarts,
+    votingEnds: proposal.votingEnds,
+    graceEnds: proposal.graceEnds,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+type IndexedProposal = Record<string, unknown> & {
+  id?: string;
+  proposalId?: string | number;
+  title?: string;
+  proposalType?: string;
+  proposalData?: `0x${string}`;
+  prevProposalId?: string | number;
+  sponsored?: boolean;
+  processed?: boolean;
+  cancelled?: boolean;
+  passed?: boolean;
+  actionFailed?: boolean;
+  votingStarts?: string | number;
+  votingEnds?: string | number;
+  graceEnds?: string | number;
+  yesBalance?: string;
+  noBalance?: string;
+  yesVotes?: string;
+  noVotes?: string;
+  dao?: {
+    totalShares?: string;
+    quorumPercent?: string;
+  };
+};

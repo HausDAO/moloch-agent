@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMemoryPostTx, buildSignalTx, buildSponsorTx, buildVoteTx } from '../src/tx.js';
+import { buildDaoMetaTx, buildMemoryPostTx, buildMintSharesTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
 
@@ -47,5 +47,76 @@ test('buildSignalTx creates submitProposal transaction', () => {
 
   assert.equal(built.tx.to, dao);
   assert.equal(built.summary.proposalKind, 'SIGNAL');
+  assert.equal(built.summary.submissionTarget, 'BAAL');
   assert.equal(built.summary.contentURI, 'ipfs://example');
+  assert.match(String(built.summary.proposalData), /^0x8d80ff0a/);
+});
+
+test('buildDaoMetaTx creates metadata proposal', () => {
+  const built = buildDaoMetaTx({
+    chainId: 8453,
+    dao,
+    communityMemoryURI: 'ipfs://memory',
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'UPDATE_METADATA_SETTINGS');
+  assert.equal(built.summary.recordTable, 'daoProfile');
+});
+
+test('buildTributeTx creates native ETH tribute transaction', () => {
+  const built = buildTributeTx({
+    chainId: 8453,
+    dao,
+    amount: 10n,
+    shares: parseBaalTokenUnits('10000'),
+  });
+
+  assert.equal(built.tx.to, '0x00768B047f73D88b6e9c14bcA97221d6E179d468');
+  assert.equal(built.tx.value, '10');
+  assert.equal(built.summary.proposalKind, 'TOKENS_FOR_SHARES');
+});
+
+test('buildMintSharesTx treats amount as 18-decimal shares', () => {
+  const built = buildMintSharesTx({
+    chainId: 8453,
+    dao,
+    recipients: [dao],
+    amounts: [parseBaalTokenUnits('1')],
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'MINT_SHARES');
+  assert.deepEqual(built.summary.amounts, ['1000000000000000000']);
+});
+
+test('buildSummonTx creates advanced token summoner transaction with metadata', () => {
+  const built = buildSummonTx({
+    chainId: 8453,
+    params: {
+      daoName: 'Example DAO',
+      description: 'Test DAO',
+      memberAddresses: [dao],
+      memberShares: ['10000000000000000000000'],
+      memberLoot: ['0'],
+      tokenName: 'Example Shares',
+      tokenSymbol: 'EXAMPLE',
+      lootTokenName: 'Example Loot',
+      lootTokenSymbol: 'EXAMPLELOOT',
+      votingPeriodInSeconds: 14400,
+      gracePeriodInSeconds: 14400,
+      newOffering: '0',
+      quorum: 30,
+      sponsorThreshold: '1000000000000000000',
+      minRetention: 66,
+      communityMemoryURI: 'ipfs://memory',
+      saltNonce: '1',
+    },
+  });
+
+  assert.equal(built.tx.to, '0x97Aaa5be8B38795245f1c38A883B44cccdfB3E11');
+  assert.equal(built.summary.proposalKind, 'SUMMON');
+  assert.equal(built.summary.daoName, 'Example DAO');
+  assert.equal(built.summary.metadataIncluded, true);
+  assert.equal(built.summary.communityMemoryURI, 'ipfs://memory');
 });
