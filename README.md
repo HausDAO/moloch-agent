@@ -99,7 +99,11 @@ moloch-agent signal --dao 0xDAO --title "Signal" --description "Body"
 moloch-agent dao-meta --dao 0xDAO --community-memory-uri ipfs://...
 moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000
 moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000
+moloch-agent swap --dao 0xDAO --token ETH --amount 0.01 --shares 0 --loot 100
+moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --amount 0.01
+moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --token 0xERC20 --amount 100 --decimals 6
 moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1
+moloch-agent mint-loot --dao 0xDAO --to 0xMEMBER --amount 100
 moloch-agent sponsor --dao 0xDAO --proposal 1
 moloch-agent vote --dao 0xDAO --proposal 1 --approved true
 moloch-agent cancel --dao 0xDAO --proposal 1
@@ -134,7 +138,13 @@ Summon share, loot, offering, and sponsor threshold values are raw integer base 
 
 If `communityMemoryURI`, `proposalWorkspaceURI`, and `sharedStateURI` are omitted, `summon` pins a starter DAO workspace and includes its `ipfs://...` URI in summon metadata.
 
-Proposal commands (`signal`, `dao-meta`, `join-dao`, `tribute`, `mint-shares`) pin a proposal workspace automatically when no `--link` or `--content-uri` is supplied. Proposal links use `ipfs://...` by default. Set `IPFS_GATEWAY_URL` when a browser gateway URL should be used instead.
+Proposal commands (`signal`, `dao-meta`, `join-dao`, `tribute`, `swap`, `payment`, `mint-shares`, `mint-loot`) pin a proposal workspace automatically when no `--link` or `--content-uri` is supplied. Proposal links use `ipfs://...` by default. Set `IPFS_GATEWAY_URL` when a browser gateway URL should be used instead.
+
+`tribute`, `join-dao`, `swap`, and `token-swap` all use the DAOhaus Tribute Minion path for requesting voting shares and/or non-voting loot in exchange for ETH or ERC-20 tokens. Native ETH `--amount` accepts human decimals such as `0.01`. ERC-20 tribute amounts are raw token units unless you use `--amount-raw` explicitly.
+
+`payment` creates a treasury transfer proposal. Without `--token`, `--amount` is a human ETH decimal. With `--token`, pass either raw token units with `--amount-raw` or provide `--decimals` so the CLI can parse human token units.
+
+`mint-shares` creates a direct voting-share issuance proposal. `mint-loot` creates a direct non-voting loot issuance proposal. Both use human 18-decimal DAO token units by default; use `--amount-raw` only for exact base units.
 
 DAOhaus admin URL helper:
 

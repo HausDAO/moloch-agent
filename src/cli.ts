@@ -13,7 +13,9 @@ import {
   buildCancelTx,
   buildDaoMetaTx,
   buildMemoryPostTx,
+  buildMintLootTx,
   buildMintSharesTx,
+  buildPaymentTx,
   buildProcessTx,
   buildSignalTx,
   buildSponsorTx,
@@ -24,6 +26,7 @@ import {
   parseBaalTokenUnits,
   parseBigint,
   parseNativeTokenAmount,
+  parseTokenUnits,
   type BuiltTx,
   type SummonParams,
 } from './tx.js';
@@ -265,6 +268,8 @@ async function main() {
 
     case 'tribute':
     case 'join-dao':
+    case 'swap':
+    case 'token-swap':
       output = await maybeSend(config, attachWorkspace(buildTributeTx({
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
@@ -272,11 +277,28 @@ async function main() {
         description: stringFlag(parsed.flags, 'description'),
         link: await proposalLink(config, service, parsed.flags, 'TOKENS_FOR_SHARES'),
         token: stringFlag(parsed.flags, 'token', 'ETH'),
-        amount: optionalBigint(parsed.flags, 'amount-raw') || parseNativeTokenAmount(stringFlag(parsed.flags, 'amount', '0') || '0'),
+        amount: parseTributeAmount(parsed.flags),
         shares: optionalBigint(parsed.flags, 'shares-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'shares', '0') || '0'),
         loot: optionalBigint(parsed.flags, 'loot-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'loot', '0') || '0'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
+      }), latestWorkspace), send);
+      break;
+
+    case 'payment':
+    case 'pay':
+      output = await maybeSend(config, attachWorkspace(buildPaymentTx({
+        chainId: config.chainId,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        recipient: asAddress(requiredFlag(parsed.flags, 'recipient')),
+        token: optionalAddress(parsed.flags, 'token'),
+        amount: parsePaymentAmount(parsed.flags),
+        title: stringFlag(parsed.flags, 'title'),
+        description: stringFlag(parsed.flags, 'description'),
+        link: await proposalLink(config, service, parsed.flags, optionalAddress(parsed.flags, 'token') ? 'TRANSFER_ERC20' : 'TRANSFER_NETWORK_TOKEN'),
+        expiration: numberFlag(parsed.flags, 'expiration', 0),
+        baalGas: optionalBigint(parsed.flags, 'baal-gas'),
+        proposalOffering: optionalBigint(parsed.flags, 'value'),
       }), latestWorkspace), send);
       break;
 
@@ -289,6 +311,21 @@ async function main() {
         title: stringFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description'),
         link: await proposalLink(config, service, parsed.flags, 'MINT_SHARES'),
+        expiration: numberFlag(parsed.flags, 'expiration', 0),
+        baalGas: optionalBigint(parsed.flags, 'baal-gas'),
+        proposalOffering: optionalBigint(parsed.flags, 'value'),
+      }), latestWorkspace), send);
+      break;
+
+    case 'mint-loot':
+      output = await maybeSend(config, attachWorkspace(buildMintLootTx({
+        chainId: config.chainId,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        recipients: listFlag(requiredFlag(parsed.flags, 'to')).map(asAddress),
+        amounts: parseAmountList(parsed.flags),
+        title: stringFlag(parsed.flags, 'title'),
+        description: stringFlag(parsed.flags, 'description'),
+        link: await proposalLink(config, service, parsed.flags, 'ISSUE'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: optionalBigint(parsed.flags, 'value'),
@@ -490,6 +527,26 @@ function parseAmountList(flags: Record<string, string | boolean>): bigint[] {
   if (raw) return listFlag(raw).map(parseBigint);
   const amount = requiredFlag(flags, 'amount');
   return listFlag(amount).map(parseBaalTokenUnits);
+}
+
+function parseTributeAmount(flags: Record<string, string | boolean>): bigint {
+  const raw = stringFlag(flags, 'amount-raw');
+  if (raw) return parseBigint(raw);
+  const amount = stringFlag(flags, 'amount', '0') || '0';
+  const token = stringFlag(flags, 'token', 'ETH') || 'ETH';
+  return /^ETH$/i.test(token) ? parseNativeTokenAmount(amount) : parseBigint(amount);
+}
+
+function parsePaymentAmount(flags: Record<string, string | boolean>): bigint {
+  const raw = stringFlag(flags, 'amount-raw');
+  if (raw) return parseBigint(raw);
+  const amount = requiredFlag(flags, 'amount');
+  if (!stringFlag(flags, 'token')) return parseNativeTokenAmount(amount);
+  const decimals = stringFlag(flags, 'decimals');
+  if (!decimals) {
+    throw new Error('ERC-20 payment proposals require --amount-raw or --decimals because token decimals vary.');
+  }
+  return parseTokenUnits(amount, Number(decimals));
 }
 
 function summarizeOutput(value: unknown): unknown {

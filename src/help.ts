@@ -25,7 +25,11 @@ Usage:
   moloch-agent dao-meta --dao 0xDAO --community-memory-uri ipfs://... [--build-only]
   moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000 [--build-only]
   moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000 [--build-only]
+  moloch-agent swap --dao 0xDAO --token ETH --amount 0.01 --shares 0 --loot 100 [--build-only]
+  moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --amount 0.01 [--build-only]
+  moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --token 0xERC20 --amount 100 --decimals 6 [--build-only]
   moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1 [--build-only]
+  moloch-agent mint-loot --dao 0xDAO --to 0xMEMBER --amount 100 [--build-only]
   moloch-agent sponsor --dao 0xDAO --proposal 1 [--build-only]
   moloch-agent vote --dao 0xDAO --proposal 1 --approved true [--build-only]
   moloch-agent cancel --dao 0xDAO --proposal 1 [--build-only]
@@ -49,7 +53,10 @@ Notes:
   summon auto-pins a DAO workspace when metadata pointers are not provided.
   proposal commands auto-pin a proposal workspace when --link/--content-uri is not provided.
   Workspace links default to ipfs:// URIs. Set IPFS_GATEWAY_URL only when browser gateway links are preferred.
-  tribute/join --amount is a human ETH decimal by default; use --amount-raw for wei.
+  tribute/join/swap creates a Tribute Minion token-swap proposal for shares and/or loot.
+  tribute/join/swap --amount is a human ETH decimal by default; ERC-20 token amounts are raw units unless --amount-raw is used.
+  payment sends ETH from the DAO treasury with decimal ETH; ERC-20 payment requires --amount-raw or --decimals.
+  mint-shares and mint-loot use human 18-decimal DAO token units by default.
   process-queue never trusts indexed passed=true as the execution gate; RPC state is used when available.
   process-ready selects the oldest ready proposal and includes a gas limit based on proposal baalGas when available.
   summon uses the Base advanced-token summoner and includes a DAOhaus metadata Poster action.

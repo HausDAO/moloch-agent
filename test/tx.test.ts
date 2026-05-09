@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCancelTx, buildDaoMetaTx, buildMemoryPostTx, buildMintSharesTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount } from '../src/tx.js';
+import { buildCancelTx, buildDaoMetaTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
 
@@ -102,6 +102,49 @@ test('buildMintSharesTx treats amount as 18-decimal shares', () => {
   assert.equal(built.tx.to, dao);
   assert.equal(built.summary.proposalKind, 'MINT_SHARES');
   assert.deepEqual(built.summary.amounts, ['1000000000000000000']);
+});
+
+test('buildMintLootTx creates non-voting loot proposal', () => {
+  const built = buildMintLootTx({
+    chainId: 8453,
+    dao,
+    recipients: [dao],
+    amounts: [parseBaalTokenUnits('100')],
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'ISSUE');
+  assert.equal(built.summary.tokenAction, 'mintLoot');
+  assert.deepEqual(built.summary.amounts, ['100000000000000000000']);
+});
+
+test('buildPaymentTx creates native ETH treasury payment proposal', () => {
+  const built = buildPaymentTx({
+    chainId: 8453,
+    dao,
+    recipient: '0x0000000000000000000000000000000000000002',
+    amount: parseNativeTokenAmount('0.01'),
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'TRANSFER_NETWORK_TOKEN');
+  assert.equal(built.summary.token, 'ETH');
+  assert.equal(built.summary.amount, '10000000000000000');
+});
+
+test('buildPaymentTx creates ERC-20 treasury payment proposal', () => {
+  const built = buildPaymentTx({
+    chainId: 8453,
+    dao,
+    recipient: '0x0000000000000000000000000000000000000002',
+    token: '0x0000000000000000000000000000000000000003',
+    amount: parseTokenUnits('1.5', 6),
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'TRANSFER_ERC20');
+  assert.equal(built.summary.token, '0x0000000000000000000000000000000000000003');
+  assert.equal(built.summary.amount, '1500000');
 });
 
 test('buildSummonTx creates advanced token summoner transaction with metadata', () => {

@@ -32,6 +32,7 @@ export const BAAL_ABI = [
   { type: 'function', name: 'processProposal', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }, { name: 'proposalData', type: 'bytes' }], outputs: [] },
   { type: 'function', name: 'cancelProposal', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }], outputs: [] },
   { type: 'function', name: 'mintShares', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address[]' }, { name: 'amount', type: 'uint256[]' }], outputs: [] },
+  { type: 'function', name: 'mintLoot', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address[]' }, { name: 'amount', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'setGovernanceConfig', stateMutability: 'nonpayable', inputs: [{ name: '_governanceConfig', type: 'bytes' }], outputs: [] },
   { type: 'function', name: 'setShamans', stateMutability: 'nonpayable', inputs: [{ name: '_shamans', type: 'address[]' }, { name: '_permissions', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'executeAsBaal', stateMutability: 'nonpayable', inputs: [{ name: '_to', type: 'address' }, { name: '_value', type: 'uint256' }, { name: '_data', type: 'bytes' }], outputs: [] },
@@ -54,6 +55,10 @@ const MULTISEND_ABI = [
 
 const TRIBUTE_MINION_ABI = [
   { type: 'function', name: 'submitTributeProposal', stateMutability: 'payable', inputs: [{ name: 'baal', type: 'address' }, { name: 'token', type: 'address' }, { name: 'amount', type: 'uint256' }, { name: 'shares', type: 'uint256' }, { name: 'loot', type: 'uint256' }, { name: 'expiration', type: 'uint32' }, { name: 'baalgas', type: 'uint256' }, { name: 'details', type: 'string' }], outputs: [] },
+] as const;
+
+const ERC20_TRANSFER_ABI = [
+  { type: 'function', name: 'transfer', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }] },
 ] as const;
 
 const SUMMONER_ABI = [
@@ -409,6 +414,95 @@ export function buildMintSharesTx(input: {
   });
 }
 
+export function buildMintLootTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  recipients: `0x${string}`[];
+  amounts: bigint[];
+  title?: string;
+  description?: string;
+  link?: string;
+  expiration?: number;
+  baalGas?: bigint;
+  proposalOffering?: bigint;
+}): BuiltTx {
+  if (!input.recipients.length) throw new Error('Missing recipient address.');
+  if (input.recipients.length !== input.amounts.length) throw new Error('Recipients and amounts must have the same length.');
+  const action = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'mintLoot',
+    args: [input.recipients, input.amounts],
+  });
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions: [{ to: input.dao, value: 0n, data: action, operation: 0 }],
+    title: input.title || 'Mint non-voting loot',
+    description: input.description || '',
+    link: input.link,
+    proposalType: 'ISSUE',
+    expiration: input.expiration,
+    baalGas: input.baalGas,
+    value: input.proposalOffering,
+    summary: {
+      action: 'submitProposal',
+      proposalKind: 'ISSUE',
+      dao: input.dao,
+      tokenAction: 'mintLoot',
+      recipients: input.recipients,
+      amounts: input.amounts.map(String),
+      note: '--amount uses human 18-decimal loot units; use --amount-raw for exact base units.',
+    },
+  });
+}
+
+export function buildPaymentTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  recipient: `0x${string}`;
+  amount: bigint;
+  token?: `0x${string}`;
+  title?: string;
+  description?: string;
+  link?: string;
+  expiration?: number;
+  baalGas?: bigint;
+  proposalOffering?: bigint;
+}): BuiltTx {
+  const isErc20 = Boolean(input.token);
+  const data = isErc20
+    ? encodeFunctionData({ abi: ERC20_TRANSFER_ABI, functionName: 'transfer', args: [input.recipient, input.amount] })
+    : '0x';
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions: [{
+      to: input.token || input.recipient,
+      value: isErc20 ? 0n : input.amount,
+      data,
+      operation: 0,
+    }],
+    title: input.title || (isErc20 ? 'Transfer ERC-20 tokens' : 'Transfer ETH'),
+    description: input.description || '',
+    link: input.link,
+    proposalType: isErc20 ? 'TRANSFER_ERC20' : 'TRANSFER_NETWORK_TOKEN',
+    expiration: input.expiration,
+    baalGas: input.baalGas,
+    value: input.proposalOffering,
+    summary: {
+      action: 'submitProposal',
+      proposalKind: isErc20 ? 'TRANSFER_ERC20' : 'TRANSFER_NETWORK_TOKEN',
+      dao: input.dao,
+      recipient: input.recipient,
+      token: input.token || 'ETH',
+      amount: input.amount.toString(),
+      note: isErc20
+        ? 'ERC-20 treasury payment proposal. Amount is raw token units unless parsed with --decimals.'
+        : 'Native ETH treasury payment proposal. --amount is a human ETH decimal.',
+    },
+  });
+}
+
 export function buildSummonTx(input: {
   chainId: number;
   params: SummonParams;
@@ -498,6 +592,12 @@ export function parseNativeTokenAmount(value: string): bigint {
   const normalized = value.trim();
   if (!/^\d+(\.\d+)?$/.test(normalized)) throw new Error('Native token amount must be a non-negative decimal number.');
   return parseEther(normalized);
+}
+
+export function parseTokenUnits(value: string, decimals: number): bigint {
+  const normalized = value.trim();
+  if (!/^\d+(\.\d+)?$/.test(normalized)) throw new Error('Token amount must be a non-negative decimal number.');
+  return parseUnits(normalized, decimals);
 }
 
 export function normalizeToken(value: string): `0x${string}` {
