@@ -6,6 +6,7 @@ import {
   encodeFunctionData,
   http,
   parseAbiParameters,
+  parseEther,
   parseUnits,
   type Hex,
 } from 'viem';
@@ -493,6 +494,12 @@ export function parseBigint(value: string): bigint {
   return BigInt(value);
 }
 
+export function parseNativeTokenAmount(value: string): bigint {
+  const normalized = value.trim();
+  if (!/^\d+(\.\d+)?$/.test(normalized)) throw new Error('Native token amount must be a non-negative decimal number.');
+  return parseEther(normalized);
+}
+
 export function normalizeToken(value: string): `0x${string}` {
   if (!value || value.toUpperCase() === 'ETH' || value.toUpperCase() === 'NATIVE') return ZERO_ADDRESS;
   return asAddress(value);
@@ -665,6 +672,7 @@ export async function maybeSend(config: Config, built: BuiltTx, send: boolean): 
     value: BigInt(built.tx.value),
     data: built.tx.data,
     gas: built.tx.gas ? BigInt(built.tx.gas) : undefined,
+    nonce: await publicClient.getTransactionCount({ address: account.address, blockTag: 'pending' }),
   });
   const hash = await walletClient.sendTransaction(request);
   return { ...built, sent: true, hash };

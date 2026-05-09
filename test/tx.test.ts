@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCancelTx, buildDaoMetaTx, buildMemoryPostTx, buildMintSharesTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits } from '../src/tx.js';
+import { buildCancelTx, buildDaoMetaTx, buildMemoryPostTx, buildMintSharesTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
 
@@ -84,6 +84,11 @@ test('buildTributeTx creates native ETH tribute transaction', () => {
   assert.equal(built.tx.to, '0x00768B047f73D88b6e9c14bcA97221d6E179d468');
   assert.equal(built.tx.value, '10');
   assert.equal(built.summary.proposalKind, 'TOKENS_FOR_SHARES');
+});
+
+test('parseNativeTokenAmount accepts decimal ETH amounts', () => {
+  assert.equal(parseNativeTokenAmount('0.01').toString(), '10000000000000000');
+  assert.equal(parseNativeTokenAmount('1').toString(), '1000000000000000000');
 });
 
 test('buildMintSharesTx treats amount as 18-decimal shares', () => {

@@ -21,8 +21,8 @@ Usage:
   moloch-agent memory-post --dao 0xDAO --thread-id topic --body "..." [--build-only]
   moloch-agent signal --dao 0xDAO --title "..." --description "..." [--link ipfs://...] [--build-only]
   moloch-agent dao-meta --dao 0xDAO --community-memory-uri ipfs://... [--build-only]
-  moloch-agent join-dao --dao 0xDAO --amount 10000000000000000 --shares 10000 [--build-only]
-  moloch-agent tribute --dao 0xDAO --token ETH --amount 10000000000000000 --shares 10000 [--build-only]
+  moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000 [--build-only]
+  moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000 [--build-only]
   moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1 [--build-only]
   moloch-agent sponsor --dao 0xDAO --proposal 1 [--build-only]
   moloch-agent vote --dao 0xDAO --proposal 1 --approved true [--build-only]
@@ -47,6 +47,7 @@ Notes:
   summon auto-pins a DAO workspace when metadata pointers are not provided.
   proposal commands auto-pin a proposal workspace when --link/--content-uri is not provided.
   Workspace links default to ipfs:// URIs. Set IPFS_GATEWAY_URL only when browser gateway links are preferred.
+  tribute/join --amount is a human ETH decimal by default; use --amount-raw for wei.
   process-queue never trusts indexed passed=true as the execution gate; RPC state is used when available.
   process-ready selects the oldest ready proposal and includes a gas limit based on proposal baalGas when available.
   summon uses the Base advanced-token summoner and includes a DAOhaus metadata Poster action.

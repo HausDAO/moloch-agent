@@ -23,6 +23,7 @@ import {
   maybeSend,
   parseBaalTokenUnits,
   parseBigint,
+  parseNativeTokenAmount,
   type BuiltTx,
   type SummonParams,
 } from './tx.js';
@@ -260,7 +261,7 @@ async function main() {
         description: stringFlag(parsed.flags, 'description'),
         link: await proposalLink(config, service, parsed.flags, 'TOKENS_FOR_SHARES'),
         token: stringFlag(parsed.flags, 'token', 'ETH'),
-        amount: optionalBigint(parsed.flags, 'amount-raw') || parseBigint(stringFlag(parsed.flags, 'amount', '0') || '0'),
+        amount: optionalBigint(parsed.flags, 'amount-raw') || parseNativeTokenAmount(stringFlag(parsed.flags, 'amount', '0') || '0'),
         shares: optionalBigint(parsed.flags, 'shares-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'shares', '0') || '0'),
         loot: optionalBigint(parsed.flags, 'loot-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'loot', '0') || '0'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),

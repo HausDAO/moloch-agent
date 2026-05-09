@@ -95,8 +95,8 @@ moloch-agent summon --params summon.json
 moloch-agent memory-post --dao 0xDAO --thread-id proposal-1 --body "Reason for vote"
 moloch-agent signal --dao 0xDAO --title "Signal" --description "Body"
 moloch-agent dao-meta --dao 0xDAO --community-memory-uri ipfs://...
-moloch-agent join-dao --dao 0xDAO --amount 10000000000000000 --shares 10000
-moloch-agent tribute --dao 0xDAO --token ETH --amount 10000000000000000 --shares 10000
+moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000
+moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000
 moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1
 moloch-agent sponsor --dao 0xDAO --proposal 1
 moloch-agent vote --dao 0xDAO --proposal 1 --approved true
