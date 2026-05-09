@@ -34,6 +34,7 @@ export const BAAL_ABI = [
   { type: 'function', name: 'mintShares', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address[]' }, { name: 'amount', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'mintLoot', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address[]' }, { name: 'amount', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'setGovernanceConfig', stateMutability: 'nonpayable', inputs: [{ name: '_governanceConfig', type: 'bytes' }], outputs: [] },
+  { type: 'function', name: 'setAdminConfig', stateMutability: 'nonpayable', inputs: [{ name: 'pauseShares', type: 'bool' }, { name: 'pauseLoot', type: 'bool' }], outputs: [] },
   { type: 'function', name: 'setShamans', stateMutability: 'nonpayable', inputs: [{ name: '_shamans', type: 'address[]' }, { name: '_permissions', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'executeAsBaal', stateMutability: 'nonpayable', inputs: [{ name: '_to', type: 'address' }, { name: '_value', type: 'uint256' }, { name: '_data', type: 'bytes' }], outputs: [] },
   { type: 'function', name: 'proposalCount', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
@@ -117,6 +118,28 @@ export type SummonParams = {
   shamanPermissions?: Array<string | number | bigint>;
   safeAddress?: `0x${string}`;
   saltNonce?: string | number | bigint;
+};
+
+export type GovernanceSettingsParams = {
+  title?: string;
+  description?: string;
+  link?: string;
+  votingPeriodInSeconds: number;
+  gracePeriodInSeconds: number;
+  newOffering: string | number | bigint;
+  quorum: string | number | bigint;
+  sponsorThreshold: string | number | bigint;
+  minRetention: string | number | bigint;
+  expiration?: number;
+  baalGas?: string | number | bigint;
+  value?: string | number | bigint;
+};
+
+export type CustomProposalAction = {
+  to: `0x${string}`;
+  value?: string | number | bigint;
+  data?: Hex;
+  operation?: number;
 };
 
 export function buildVoteTx(input: { chainId: number; dao: `0x${string}`; proposal: number; approved: boolean }): BuiltTx {
@@ -499,6 +522,133 @@ export function buildPaymentTx(input: {
       note: isErc20
         ? 'ERC-20 treasury payment proposal. Amount is raw token units unless parsed with --decimals.'
         : 'Native ETH treasury payment proposal. --amount is a human ETH decimal.',
+    },
+  });
+}
+
+export function buildGovernanceSettingsTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  params: GovernanceSettingsParams;
+  link?: string;
+}): BuiltTx {
+  const params = input.params;
+  const inner = encodeValues(
+    ['uint32', 'uint32', 'uint256', 'uint256', 'uint256', 'uint256'],
+    [
+      params.votingPeriodInSeconds,
+      params.gracePeriodInSeconds,
+      BigInt(params.newOffering),
+      rawPercent('quorum', params.quorum),
+      BigInt(params.sponsorThreshold),
+      rawPercent('minRetention', params.minRetention),
+    ],
+  );
+  const action = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'setGovernanceConfig',
+    args: [inner],
+  });
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions: [{ to: input.dao, value: 0n, data: action, operation: 0 }],
+    title: params.title || 'Update governance settings',
+    description: params.description || '',
+    link: input.link || params.link,
+    proposalType: 'UPDATE_GOV_SETTINGS',
+    expiration: params.expiration,
+    baalGas: params.baalGas == null ? undefined : BigInt(params.baalGas),
+    value: params.value == null ? undefined : BigInt(params.value),
+    summary: {
+      action: 'submitProposal',
+      proposalKind: 'UPDATE_GOV_SETTINGS',
+      dao: input.dao,
+      votingPeriodInSeconds: params.votingPeriodInSeconds,
+      gracePeriodInSeconds: params.gracePeriodInSeconds,
+      newOffering: String(params.newOffering),
+      quorum: rawPercent('quorum', params.quorum).toString(),
+      sponsorThreshold: String(params.sponsorThreshold),
+      minRetention: rawPercent('minRetention', params.minRetention).toString(),
+    },
+  });
+}
+
+export function buildTokenSettingsTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  pauseShares: boolean;
+  pauseLoot: boolean;
+  title?: string;
+  description?: string;
+  link?: string;
+  expiration?: number;
+  baalGas?: bigint;
+  proposalOffering?: bigint;
+}): BuiltTx {
+  const action = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'setAdminConfig',
+    args: [input.pauseShares, input.pauseLoot],
+  });
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions: [{ to: input.dao, value: 0n, data: action, operation: 0 }],
+    title: input.title || 'Update token settings',
+    description: input.description || '',
+    link: input.link,
+    proposalType: 'TOKEN_SETTINGS',
+    expiration: input.expiration,
+    baalGas: input.baalGas,
+    value: input.proposalOffering,
+    summary: {
+      action: 'submitProposal',
+      proposalKind: 'TOKEN_SETTINGS',
+      dao: input.dao,
+      pauseShares: input.pauseShares,
+      pauseLoot: input.pauseLoot,
+    },
+  });
+}
+
+export function buildCustomProposalTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  title: string;
+  description?: string;
+  link?: string;
+  proposalType?: string;
+  actions: CustomProposalAction[];
+  expiration?: number;
+  baalGas?: bigint;
+  proposalOffering?: bigint;
+}): BuiltTx {
+  if (!input.actions.length) throw new Error('Custom proposal requires at least one action.');
+  const actions = input.actions.map((action) => ({
+    to: asAddress(action.to),
+    value: BigInt(action.value || 0),
+    data: action.data || '0x',
+    operation: Number(action.operation || 0),
+  }));
+  return buildProposalTx({
+    chainId: input.chainId,
+    dao: input.dao,
+    actions,
+    title: input.title,
+    description: input.description || '',
+    link: input.link,
+    proposalType: input.proposalType || 'CUSTOM',
+    expiration: input.expiration,
+    baalGas: input.baalGas,
+    value: input.proposalOffering,
+    summary: {
+      action: 'submitProposal',
+      proposalKind: input.proposalType || 'CUSTOM',
+      dao: input.dao,
+      actionCount: actions.length,
+      targets: actions.map((action) => action.to),
+      note: 'Generic Baal proposal from supplied action JSON. Use --full to inspect calldata.',
     },
   });
 }

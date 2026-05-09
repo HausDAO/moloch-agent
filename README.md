@@ -97,6 +97,9 @@ moloch-agent summon --params summon.json
 moloch-agent memory-post --dao 0xDAO --thread-id proposal-1 --body "Reason for vote"
 moloch-agent signal --dao 0xDAO --title "Signal" --description "Body"
 moloch-agent dao-meta --dao 0xDAO --community-memory-uri ipfs://...
+moloch-agent gov-settings --dao 0xDAO --params gov-settings.json
+moloch-agent token-settings --dao 0xDAO --pause-shares false --pause-loot false
+moloch-agent custom-proposal --dao 0xDAO --title "Custom action" --actions actions.json
 moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000
 moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000
 moloch-agent swap --dao 0xDAO --token ETH --amount 0.01 --shares 0 --loot 100
@@ -138,7 +141,13 @@ Summon share, loot, offering, and sponsor threshold values are raw integer base 
 
 If `communityMemoryURI`, `proposalWorkspaceURI`, and `sharedStateURI` are omitted, `summon` pins a starter DAO workspace and includes its `ipfs://...` URI in summon metadata.
 
-Proposal commands (`signal`, `dao-meta`, `join-dao`, `tribute`, `swap`, `payment`, `mint-shares`, `mint-loot`) pin a proposal workspace automatically when no `--link` or `--content-uri` is supplied. Proposal links use `ipfs://...` by default. Set `IPFS_GATEWAY_URL` when a browser gateway URL should be used instead.
+Proposal commands (`signal`, `dao-meta`, `gov-settings`, `token-settings`, `custom-proposal`, `join-dao`, `tribute`, `swap`, `payment`, `mint-shares`, `mint-loot`) pin a proposal workspace automatically when no `--link` or `--content-uri` is supplied. Proposal links use `ipfs://...` by default. Set `IPFS_GATEWAY_URL` when a browser gateway URL should be used instead.
+
+`gov-settings` reads a JSON file with `votingPeriodInSeconds`, `gracePeriodInSeconds`, `newOffering`, `quorum`, `sponsorThreshold`, and `minRetention`. `quorum` and `minRetention` are whole-number percentages.
+
+`token-settings` changes Baal share/loot pause state with `setAdminConfig`.
+
+`custom-proposal` is the generic Baal proposal escape hatch. Pass an actions JSON array like `[{"to":"0x...","value":"0","data":"0x...","operation":0}]`.
 
 `tribute`, `join-dao`, `swap`, and `token-swap` all use the DAOhaus Tribute Minion path for requesting voting shares and/or non-voting loot in exchange for ETH or ERC-20 tokens. Native ETH `--amount` accepts human decimals such as `0.01`. ERC-20 tribute amounts are raw token units unless you use `--amount-raw` explicitly.
 

@@ -11,7 +11,9 @@ import {
   asHex,
   asProposalId,
   buildCancelTx,
+  buildCustomProposalTx,
   buildDaoMetaTx,
+  buildGovernanceSettingsTx,
   buildMemoryPostTx,
   buildMintLootTx,
   buildMintSharesTx,
@@ -20,6 +22,7 @@ import {
   buildSignalTx,
   buildSponsorTx,
   buildSummonTx,
+  buildTokenSettingsTx,
   buildTributeTx,
   buildVoteTx,
   maybeSend,
@@ -28,6 +31,8 @@ import {
   parseNativeTokenAmount,
   parseTokenUnits,
   type BuiltTx,
+  type CustomProposalAction,
+  type GovernanceSettingsParams,
   type SummonParams,
 } from './tx.js';
 
@@ -260,6 +265,47 @@ async function main() {
         proposalWorkspaceURI: stringFlag(parsed.flags, 'proposal-workspace-uri'),
         sharedStateURI: stringFlag(parsed.flags, 'shared-state-uri'),
         web: stringFlag(parsed.flags, 'web'),
+        expiration: numberFlag(parsed.flags, 'expiration', 0),
+        baalGas: optionalBigint(parsed.flags, 'baal-gas'),
+        proposalOffering: optionalBigint(parsed.flags, 'value'),
+      }), latestWorkspace), send);
+      break;
+
+    case 'gov-settings':
+    case 'governance-settings':
+      output = await maybeSend(config, attachWorkspace(buildGovernanceSettingsTx({
+        chainId: config.chainId,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        params: readJsonFile(requiredFlag(parsed.flags, 'params')) as GovernanceSettingsParams,
+        link: await proposalLink(config, service, parsed.flags, 'UPDATE_GOV_SETTINGS'),
+      }), latestWorkspace), send);
+      break;
+
+    case 'token-settings':
+      output = await maybeSend(config, attachWorkspace(buildTokenSettingsTx({
+        chainId: config.chainId,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        pauseShares: parseBool(requiredFlag(parsed.flags, 'pause-shares')),
+        pauseLoot: parseBool(requiredFlag(parsed.flags, 'pause-loot')),
+        title: stringFlag(parsed.flags, 'title'),
+        description: stringFlag(parsed.flags, 'description'),
+        link: await proposalLink(config, service, parsed.flags, 'TOKEN_SETTINGS'),
+        expiration: numberFlag(parsed.flags, 'expiration', 0),
+        baalGas: optionalBigint(parsed.flags, 'baal-gas'),
+        proposalOffering: optionalBigint(parsed.flags, 'value'),
+      }), latestWorkspace), send);
+      break;
+
+    case 'custom-proposal':
+    case 'custom':
+      output = await maybeSend(config, attachWorkspace(buildCustomProposalTx({
+        chainId: config.chainId,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        title: requiredFlag(parsed.flags, 'title'),
+        description: stringFlag(parsed.flags, 'description'),
+        link: await proposalLink(config, service, parsed.flags, stringFlag(parsed.flags, 'proposal-type', 'CUSTOM') || 'CUSTOM'),
+        proposalType: stringFlag(parsed.flags, 'proposal-type', 'CUSTOM'),
+        actions: readJsonFile(requiredFlag(parsed.flags, 'actions')) as CustomProposalAction[],
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: optionalBigint(parsed.flags, 'value'),

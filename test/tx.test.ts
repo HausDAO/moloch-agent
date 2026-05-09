@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCancelTx, buildDaoMetaTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits } from '../src/tx.js';
+import { buildCancelTx, buildCustomProposalTx, buildDaoMetaTx, buildGovernanceSettingsTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTokenSettingsTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
 
@@ -145,6 +145,53 @@ test('buildPaymentTx creates ERC-20 treasury payment proposal', () => {
   assert.equal(built.summary.proposalKind, 'TRANSFER_ERC20');
   assert.equal(built.summary.token, '0x0000000000000000000000000000000000000003');
   assert.equal(built.summary.amount, '1500000');
+});
+
+test('buildGovernanceSettingsTx creates governance config proposal', () => {
+  const built = buildGovernanceSettingsTx({
+    chainId: 8453,
+    dao,
+    params: {
+      votingPeriodInSeconds: 14400,
+      gracePeriodInSeconds: 14400,
+      newOffering: '0',
+      quorum: 30,
+      sponsorThreshold: '1000000000000000000',
+      minRetention: 66,
+    },
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'UPDATE_GOV_SETTINGS');
+  assert.equal(built.summary.quorum, '30');
+  assert.equal(built.summary.minRetention, '66');
+});
+
+test('buildTokenSettingsTx creates token settings proposal', () => {
+  const built = buildTokenSettingsTx({
+    chainId: 8453,
+    dao,
+    pauseShares: false,
+    pauseLoot: true,
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'TOKEN_SETTINGS');
+  assert.equal(built.summary.pauseShares, false);
+  assert.equal(built.summary.pauseLoot, true);
+});
+
+test('buildCustomProposalTx creates generic action proposal', () => {
+  const built = buildCustomProposalTx({
+    chainId: 8453,
+    dao,
+    title: 'Custom action',
+    actions: [{ to: dao, value: '0', data: '0x', operation: 0 }],
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.summary.proposalKind, 'CUSTOM');
+  assert.equal(built.summary.actionCount, 1);
 });
 
 test('buildSummonTx creates advanced token summoner transaction with metadata', () => {

@@ -23,6 +23,9 @@ Usage:
   moloch-agent memory-post --dao 0xDAO --thread-id topic --body "..." [--build-only]
   moloch-agent signal --dao 0xDAO --title "..." --description "..." [--link ipfs://...] [--build-only]
   moloch-agent dao-meta --dao 0xDAO --community-memory-uri ipfs://... [--build-only]
+  moloch-agent gov-settings --dao 0xDAO --params gov-settings.json [--build-only]
+  moloch-agent token-settings --dao 0xDAO --pause-shares false --pause-loot false [--build-only]
+  moloch-agent custom-proposal --dao 0xDAO --title "..." --actions actions.json [--build-only]
   moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000 [--build-only]
   moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000 [--build-only]
   moloch-agent swap --dao 0xDAO --token ETH --amount 0.01 --shares 0 --loot 100 [--build-only]
@@ -53,6 +56,9 @@ Notes:
   summon auto-pins a DAO workspace when metadata pointers are not provided.
   proposal commands auto-pin a proposal workspace when --link/--content-uri is not provided.
   Workspace links default to ipfs:// URIs. Set IPFS_GATEWAY_URL only when browser gateway links are preferred.
+  gov-settings reads JSON with votingPeriodInSeconds, gracePeriodInSeconds, newOffering, quorum, sponsorThreshold, and minRetention.
+  token-settings calls Baal setAdminConfig for share/loot pause state.
+  custom-proposal reads an actions JSON array: [{ "to": "0x...", "value": "0", "data": "0x...", "operation": 0 }].
   tribute/join/swap creates a Tribute Minion token-swap proposal for shares and/or loot.
   tribute/join/swap --amount is a human ETH decimal by default; ERC-20 token amounts are raw units unless --amount-raw is used.
   payment sends ETH from the DAO treasury with decimal ETH; ERC-20 payment requires --amount-raw or --decimals.
