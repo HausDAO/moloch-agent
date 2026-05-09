@@ -29,6 +29,7 @@ export const BAAL_ABI = [
   { type: 'function', name: 'sponsorProposal', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }], outputs: [] },
   { type: 'function', name: 'submitVote', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }, { name: 'approved', type: 'bool' }], outputs: [] },
   { type: 'function', name: 'processProposal', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }, { name: 'proposalData', type: 'bytes' }], outputs: [] },
+  { type: 'function', name: 'cancelProposal', stateMutability: 'nonpayable', inputs: [{ name: 'id', type: 'uint32' }], outputs: [] },
   { type: 'function', name: 'mintShares', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address[]' }, { name: 'amount', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'setGovernanceConfig', stateMutability: 'nonpayable', inputs: [{ name: '_governanceConfig', type: 'bytes' }], outputs: [] },
   { type: 'function', name: 'setShamans', stateMutability: 'nonpayable', inputs: [{ name: '_shamans', type: 'address[]' }, { name: '_permissions', type: 'uint256[]' }], outputs: [] },
@@ -134,6 +135,19 @@ export function buildSponsorTx(input: { chainId: number; dao: `0x${string}`; pro
   });
   return withSummary(tx(input.chainId, input.dao, data), {
     action: 'sponsor',
+    dao: input.dao,
+    proposalId: input.proposal,
+  });
+}
+
+export function buildCancelTx(input: { chainId: number; dao: `0x${string}`; proposal: number }): BuiltTx {
+  const data = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'cancelProposal',
+    args: [input.proposal],
+  });
+  return withSummary(tx(input.chainId, input.dao, data), {
+    action: 'cancel',
     dao: input.dao,
     proposalId: input.proposal,
   });

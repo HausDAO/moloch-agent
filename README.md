@@ -80,6 +80,8 @@ moloch-agent capabilities
 moloch-agent dao --dao 0xDAO
 moloch-agent proposals --dao 0xDAO
 moloch-agent proposal --dao 0xDAO --proposal 1
+moloch-agent daohaus-url --dao 0xDAO
+moloch-agent links --dao 0xDAO --address 0xCONTRACT --tx 0xHASH
 moloch-agent read-dao --dao 0xDAO
 moloch-agent read-proposal --dao 0xDAO --proposal 1
 moloch-agent proposal-lifecycle --dao 0xDAO --proposal 1
@@ -87,6 +89,8 @@ moloch-agent process-queue --dao 0xDAO
 moloch-agent members --dao 0xDAO
 moloch-agent records --dao 0xDAO --table communityMemory
 moloch-agent pin-json --file community-state.json --name community-state-v1
+moloch-agent workspace-create --kind dao --dao 0xDAO --title "DAO Workspace"
+moloch-agent workspace-create --kind proposal --dao 0xDAO --title "Proposal Workspace"
 moloch-agent summon --params summon.json
 moloch-agent memory-post --dao 0xDAO --thread-id proposal-1 --body "Reason for vote"
 moloch-agent signal --dao 0xDAO --title "Signal" --description "Body"
@@ -96,6 +100,7 @@ moloch-agent tribute --dao 0xDAO --token ETH --amount 10000000000000000 --shares
 moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1
 moloch-agent sponsor --dao 0xDAO --proposal 1
 moloch-agent vote --dao 0xDAO --proposal 1 --approved true
+moloch-agent cancel --dao 0xDAO --proposal 1
 moloch-agent process --dao 0xDAO --proposal 1 --proposal-data 0x...
 moloch-agent process-ready --dao 0xDAO
 ```
@@ -125,11 +130,25 @@ Minimal summon params:
 
 Summon share, loot, offering, and sponsor threshold values are raw integer base units. Percent fields are whole-number percentages.
 
+If `communityMemoryURI`, `proposalWorkspaceURI`, and `sharedStateURI` are omitted, `summon` pins a starter DAO workspace and includes its `ipfs://...` URI in summon metadata.
+
+Proposal commands (`signal`, `dao-meta`, `join-dao`, `tribute`, `mint-shares`) pin a proposal workspace automatically when no `--link` or `--content-uri` is supplied. Proposal links use `ipfs://...` by default. Set `IPFS_GATEWAY_URL` when a browser gateway URL should be used instead.
+
+DAOhaus admin URL helper:
+
+```bash
+moloch-agent daohaus-url --dao 0xf58be4395defe88ca261c2d869642c06baccec16
+moloch-agent links --dao 0xf58be4395defe88ca261c2d869642c06baccec16 --proposal 1
+moloch-agent links --address 0xf58be4395defe88ca261c2d869642c06baccec16
+```
+
 ## Boundaries
 
 - The hosted service handles Graph reads and Pinata uploads.
 - The CLI owns local signing commands.
 - The service must never receive private keys.
-- `process-queue` and `process-ready` use direct chain state when `RPC_URL` is set and do not rely on indexed `passed` as the execution gate.
+- `process-queue` and `process-ready` use direct chain state and do not rely on indexed `passed` as the execution gate.
+- `RPC_URL` defaults to `https://mainnet.base.org` so the CLI works out of the box.
+- Always-on agents should set a managed Base RPC URL for reliability.
 
-Transaction commands sign and broadcast by default. Use `--build-only` to build unsigned summaries, and `--full` to print calldata. Signing and broadcasting require `PRIVATE_KEY` and `RPC_URL`.
+Transaction commands sign and broadcast by default. Use `--build-only` to build unsigned summaries, and `--full` to print calldata. Signing and broadcasting require `PRIVATE_KEY`; `RPC_URL` is optional but recommended.

@@ -2,14 +2,15 @@
 import { parseArgs, numberFlag, requiredFlag, stringFlag } from './args.js';
 import { readJsonFile } from './files.js';
 import { helpText } from './help.js';
-import { getConfig } from './config.js';
-import { createServiceClient } from './service.js';
+import { getConfig, type Config } from './config.js';
+import { createServiceClient, type ServiceClient } from './service.js';
 import { printCompact, printJson } from './output.js';
 import { buildOldestReadyProcessTx, processQueue, proposalLifecycle, readDaoDirect, readProposalDirect } from './chain.js';
 import {
   asAddress,
   asHex,
   asProposalId,
+  buildCancelTx,
   buildDaoMetaTx,
   buildMemoryPostTx,
   buildMintSharesTx,
@@ -22,6 +23,8 @@ import {
   maybeSend,
   parseBaalTokenUnits,
   parseBigint,
+  type BuiltTx,
+  type SummonParams,
 } from './tx.js';
 
 async function main() {
@@ -65,6 +68,17 @@ async function main() {
       output = await service.proposal({
         dao: requiredFlag(parsed.flags, 'dao'),
         proposal: requiredFlag(parsed.flags, 'proposal'),
+      });
+      break;
+
+    case 'links':
+    case 'admin-url':
+    case 'daohaus-url':
+      output = linksFor(config.chainId, {
+        dao: stringFlag(parsed.flags, 'dao'),
+        proposal: stringFlag(parsed.flags, 'proposal'),
+        address: stringFlag(parsed.flags, 'address') || stringFlag(parsed.flags, 'contract'),
+        tx: stringFlag(parsed.flags, 'tx') || stringFlag(parsed.flags, 'hash'),
       });
       break;
 
@@ -118,11 +132,24 @@ async function main() {
       });
       break;
 
+    case 'workspace-create':
+      output = await createWorkspace(service, {
+        config,
+        kind: parseWorkspaceKind(stringFlag(parsed.flags, 'kind', 'dao') || 'dao'),
+        dao: stringFlag(parsed.flags, 'dao'),
+        daoName: stringFlag(parsed.flags, 'dao-name'),
+        proposalKind: stringFlag(parsed.flags, 'proposal-kind'),
+        proposalId: stringFlag(parsed.flags, 'proposal'),
+        title: stringFlag(parsed.flags, 'title'),
+        description: stringFlag(parsed.flags, 'description'),
+      });
+      break;
+
     case 'summon':
-      output = await maybeSend(config, buildSummonTx({
+      output = await maybeSend(config, attachWorkspace(buildSummonTx({
         chainId: config.chainId,
-        params: readJsonFile(requiredFlag(parsed.flags, 'params')) as Parameters<typeof buildSummonTx>[0]['params'],
-      }), send);
+        params: await summonParamsWithWorkspace(config, service, readJsonFile(requiredFlag(parsed.flags, 'params')) as SummonParams, Boolean(parsed.flags['no-workspace'])),
+      }), latestWorkspace), send);
       break;
 
     case 'vote':
@@ -136,6 +163,14 @@ async function main() {
 
     case 'sponsor':
       output = await maybeSend(config, buildSponsorTx({
+        chainId: config.chainId,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        proposal: asProposalId(requiredFlag(parsed.flags, 'proposal')),
+      }), send);
+      break;
+
+    case 'cancel':
+      output = await maybeSend(config, buildCancelTx({
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         proposal: asProposalId(requiredFlag(parsed.flags, 'proposal')),
@@ -185,25 +220,25 @@ async function main() {
       break;
 
     case 'signal':
-      output = await maybeSend(config, buildSignalTx({
+      output = await maybeSend(config, attachWorkspace(buildSignalTx({
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         title: requiredFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description', '') || '',
-        link: stringFlag(parsed.flags, 'link') || stringFlag(parsed.flags, 'content-uri'),
+        link: await proposalLink(config, service, parsed.flags, 'SIGNAL'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: optionalBigint(parsed.flags, 'value'),
-      }), send);
+      }), latestWorkspace), send);
       break;
 
     case 'dao-meta':
-      output = await maybeSend(config, buildDaoMetaTx({
+      output = await maybeSend(config, attachWorkspace(buildDaoMetaTx({
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         title: stringFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description'),
-        link: stringFlag(parsed.flags, 'link') || stringFlag(parsed.flags, 'content-uri'),
+        link: await proposalLink(config, service, parsed.flags, 'UPDATE_METADATA_SETTINGS'),
         name: stringFlag(parsed.flags, 'name'),
         daoDescription: stringFlag(parsed.flags, 'dao-description'),
         communityMemoryURI: stringFlag(parsed.flags, 'community-memory-uri'),
@@ -213,39 +248,39 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: optionalBigint(parsed.flags, 'value'),
-      }), send);
+      }), latestWorkspace), send);
       break;
 
     case 'tribute':
     case 'join-dao':
-      output = await maybeSend(config, buildTributeTx({
+      output = await maybeSend(config, attachWorkspace(buildTributeTx({
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         title: stringFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description'),
-        link: stringFlag(parsed.flags, 'link') || stringFlag(parsed.flags, 'content-uri'),
+        link: await proposalLink(config, service, parsed.flags, 'TOKENS_FOR_SHARES'),
         token: stringFlag(parsed.flags, 'token', 'ETH'),
         amount: optionalBigint(parsed.flags, 'amount-raw') || parseBigint(stringFlag(parsed.flags, 'amount', '0') || '0'),
         shares: optionalBigint(parsed.flags, 'shares-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'shares', '0') || '0'),
         loot: optionalBigint(parsed.flags, 'loot-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'loot', '0') || '0'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-      }), send);
+      }), latestWorkspace), send);
       break;
 
     case 'mint-shares':
-      output = await maybeSend(config, buildMintSharesTx({
+      output = await maybeSend(config, attachWorkspace(buildMintSharesTx({
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         recipients: listFlag(requiredFlag(parsed.flags, 'to')).map(asAddress),
         amounts: parseAmountList(parsed.flags),
         title: stringFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description'),
-        link: stringFlag(parsed.flags, 'link') || stringFlag(parsed.flags, 'content-uri'),
+        link: await proposalLink(config, service, parsed.flags, 'MINT_SHARES'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: optionalBigint(parsed.flags, 'value'),
-      }), send);
+      }), latestWorkspace), send);
       break;
 
     default:
@@ -257,11 +292,166 @@ async function main() {
   else printJson(printable);
 }
 
+let latestWorkspace: WorkspaceResult | undefined;
+
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`${message}\n`);
   process.exit(1);
 });
+
+function linksFor(chainId: number, input: { dao?: string; proposal?: string; address?: string; tx?: string }): Record<string, string | number> {
+  const dao = input.dao ? asAddress(input.dao) : undefined;
+  const address = input.address ? asAddress(input.address) : undefined;
+  const tx = input.tx ? asHex(input.tx) : undefined;
+  if (!dao && !address && !tx) throw new Error('Provide --dao, --address, or --tx.');
+  const adminBase = dao ? `https://admin.daohaus.club/molochv3/0x${chainId.toString(16)}/${dao}` : '';
+  const explorerBase = explorerBaseUrl(chainId);
+  return {
+    chainId,
+    dao: dao || '',
+    daoUrl: adminBase,
+    proposalsUrl: adminBase ? `${adminBase}/proposals` : '',
+    proposalUrl: adminBase && input.proposal ? `${adminBase}/proposal/${input.proposal}` : '',
+    daoExplorerUrl: dao ? `${explorerBase}/address/${dao}` : '',
+    address: address || '',
+    addressExplorerUrl: address ? `${explorerBase}/address/${address}` : '',
+    addressCodeUrl: address ? `${explorerBase}/address/${address}#code` : '',
+    tx: tx || '',
+    txExplorerUrl: tx ? `${explorerBase}/tx/${tx}` : '',
+  };
+}
+
+function explorerBaseUrl(chainId: number): string {
+  if (chainId === 8453) return 'https://basescan.org';
+  if (chainId === 1) return 'https://etherscan.io';
+  return `https://basescan.org`;
+}
+
+async function proposalLink(
+  config: Config,
+  service: ServiceClient,
+  flags: Record<string, string | boolean>,
+  proposalKind: string,
+): Promise<string> {
+  const explicit = stringFlag(flags, 'link') || stringFlag(flags, 'content-uri');
+  if (explicit || flags['no-workspace']) return explicit || '';
+  const title = stringFlag(flags, 'title');
+  if (!title) return '';
+  const workspace = await createWorkspace(service, {
+    config,
+    kind: 'proposal',
+    dao: requiredFlag(flags, 'dao'),
+    proposalKind,
+    title,
+    description: stringFlag(flags, 'description'),
+  });
+  latestWorkspace = workspace;
+  return workspace.link;
+}
+
+async function summonParamsWithWorkspace(
+  config: Config,
+  service: ServiceClient,
+  params: SummonParams,
+  noWorkspace: boolean,
+): Promise<SummonParams> {
+  if (noWorkspace || params.communityMemoryURI || params.proposalWorkspaceURI || params.sharedStateURI) return params;
+  const workspace = await createWorkspace(service, {
+    config,
+    kind: 'dao',
+    daoName: params.daoName,
+    title: `${params.daoName} workspace`,
+    description: params.description,
+  });
+  latestWorkspace = workspace;
+  return {
+    ...params,
+    communityMemoryURI: workspace.uri,
+    proposalWorkspaceURI: workspace.uri,
+    sharedStateURI: workspace.uri,
+  };
+}
+
+async function createWorkspace(service: ServiceClient, input: WorkspaceInput): Promise<WorkspaceResult> {
+  const now = new Date().toISOString();
+  const slug = slugify(input.title || input.daoName || input.dao || input.kind);
+  const workspace = compactObject({
+    schema: input.kind === 'dao' ? 'dao-workspace/v1' : 'proposal-workspace/v1',
+    kind: input.kind,
+    dao: input.dao?.toLowerCase(),
+    daoName: input.daoName,
+    proposalId: input.proposalId,
+    proposalKind: input.proposalKind,
+    title: input.title,
+    description: input.description,
+    createdAt: now,
+    updatedAt: now,
+    communityState: input.kind === 'dao' ? {
+      version: 1,
+      body: input.description || '',
+      ratifiedByProposalId: null,
+    } : undefined,
+    threads: input.kind === 'proposal' ? [
+      { id: 'deliberation', title: 'Deliberation' },
+      { id: 'vote-reasons', title: 'Vote Reasons' },
+      { id: 'retro', title: 'Retro' },
+    ] : [
+      { id: 'community-state', title: 'Community State' },
+      { id: 'join-rules', title: 'Join Rules' },
+      { id: 'operations', title: 'Operations' },
+    ],
+    records: [],
+  });
+  const pinned = normalizePinResult(await service.pinJson({
+    name: `${input.kind}-workspace-${slug}-${Date.now()}`,
+    data: workspace,
+  }));
+  const link = input.config.ipfsGatewayUrl ? pinned.gatewayUrl : pinned.uri;
+  return {
+    ...pinned,
+    kind: input.kind,
+    link,
+    workspace,
+  };
+}
+
+function attachWorkspace<T extends BuiltTx>(built: T, workspace?: WorkspaceResult): T {
+  if (!workspace) return built;
+  return {
+    ...built,
+    summary: {
+      ...built.summary,
+      workspaceURI: workspace.uri,
+      workspaceLink: workspace.link,
+      workspaceGatewayUrl: workspace.gatewayUrl,
+    },
+  };
+}
+
+function normalizePinResult(value: unknown): PinResult {
+  if (!value || typeof value !== 'object') throw new Error('Pinning service returned an invalid response.');
+  const record = value as Record<string, unknown>;
+  const cid = String(record.cid || '');
+  const uri = String(record.uri || (cid ? `ipfs://${cid}` : ''));
+  const gatewayUrl = String(record.gatewayUrl || '');
+  if (!cid || !uri) throw new Error('Pinning service response is missing cid/uri.');
+  return {
+    cid,
+    uri,
+    gatewayUrl,
+    name: typeof record.name === 'string' ? record.name : undefined,
+  };
+}
+
+function parseWorkspaceKind(value: string): WorkspaceKind {
+  if (value === 'dao' || value === 'proposal') return value;
+  throw new Error('--kind must be dao or proposal.');
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'workspace';
+}
 
 function parseBool(value: string): boolean {
   if (/^(true|1|yes|y)$/i.test(value)) return true;
@@ -299,4 +489,34 @@ function summarizeTxOutput(value: unknown): unknown {
     };
   }
   return value;
+}
+
+type WorkspaceKind = 'dao' | 'proposal';
+
+type WorkspaceInput = {
+  config: Config;
+  kind: WorkspaceKind;
+  dao?: string;
+  daoName?: string;
+  proposalKind?: string;
+  proposalId?: string;
+  title?: string;
+  description?: string;
+};
+
+type PinResult = {
+  cid: string;
+  uri: string;
+  gatewayUrl: string;
+  name?: string;
+};
+
+type WorkspaceResult = PinResult & {
+  kind: WorkspaceKind;
+  link: string;
+  workspace: Record<string, unknown>;
+};
+
+function compactObject<T extends Record<string, unknown>>(value: T): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined && item !== null && item !== ''));
 }

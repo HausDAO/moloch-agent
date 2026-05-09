@@ -50,21 +50,28 @@ export async function proposalLifecycle(input: {
   dao: `0x${string}`;
   proposal: number;
 }): Promise<Record<string, unknown>> {
-  const indexed = await input.service.proposal({ dao: input.dao, proposal: String(input.proposal) });
-  const proposal = extractProposal(indexed);
-  if (!proposal) throw new Error(`Proposal ${input.proposal} not found.`);
+  let indexed: unknown;
+  let indexedError: string | undefined;
+  try {
+    indexed = await input.service.proposal({ dao: input.dao, proposal: String(input.proposal) });
+  } catch (error) {
+    indexedError = compactError(error);
+  }
+  const proposal = extractProposal(indexed) || await chainOnlyProposal(input.config, input.dao, input.proposal);
   let chain: Record<string, unknown> = {};
   if (input.config.rpcUrl) {
     try {
       chain = await chainProposalContext(input.config, input.dao, proposal);
     } catch (error) {
-      chain = { error: error instanceof Error ? error.message : String(error) };
+      chain = { error: compactError(error) };
     }
   }
   return {
     proposal: compactProposal(proposal),
     lifecycle: deriveProposalLifecycle(proposal, Math.floor(Date.now() / 1000), chain),
     chain,
+    indexedError,
+    mode: indexedError ? 'chain-fallback' : 'indexed+chain',
   };
 }
 
@@ -74,8 +81,23 @@ export async function processQueue(input: {
   dao: `0x${string}`;
   first: number;
 }): Promise<Record<string, unknown>> {
-  const indexed = await input.service.proposals({ dao: input.dao, first: input.first, skip: 0 });
+  let indexed: unknown;
+  let indexedError: string | undefined;
+  try {
+    indexed = await input.service.proposals({ dao: input.dao, first: input.first, skip: 0 });
+  } catch (error) {
+    indexedError = compactError(error);
+  }
   const proposals = extractProposals(indexed);
+  if (!proposals.length && indexedError) {
+    return {
+      dao: input.dao,
+      queue: [],
+      indexedError,
+      mode: 'chain-fallback-unavailable',
+      note: 'Indexed proposal list failed. process-queue needs indexed proposalData to build process transactions.',
+    };
+  }
   const candidates = proposals
     .filter((proposal) => (
       proposal.proposalId != null &&
@@ -110,7 +132,7 @@ export async function processQueue(input: {
         lifecycle: {
           status: 'chainPreflightError',
           processableNow: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: compactError(error),
         },
       };
     }
@@ -121,7 +143,7 @@ export async function processQueue(input: {
     .sort((a, b) => Number(a.proposal.proposalId) - Number(b.proposal.proposalId))
     .map((item, index) => ({ ...queueItem(item.proposal, item.lifecycle), queueIndex: index, processFirst: index === 0 }));
 
-  return { dao: input.dao, queue };
+  return { dao: input.dao, queue, indexedError, mode: indexedError ? 'chain-fallback' : 'indexed+chain' };
 }
 
 export async function buildOldestReadyProcessTx(input: {
@@ -175,6 +197,36 @@ async function chainProposalContext(config: Config, dao: `0x${string}`, proposal
     prevState: Number(prevState),
     proposal: tuple,
     processGasLimit: (baalGas > 0n ? baalGas + PROCESS_PROPOSAL_GAS_LIMIT_ADDITION : DEFAULT_PROCESS_GAS_LIMIT).toString(),
+  };
+}
+
+async function chainOnlyProposal(config: Config, dao: `0x${string}`, proposalId: number): Promise<IndexedProposal> {
+  const client = publicClient(config);
+  const [raw, rawStatus, state] = await Promise.all([
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'proposals', args: [BigInt(proposalId)] }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'getProposalStatus', args: [proposalId] }),
+    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'state', args: [proposalId] }),
+  ]);
+  const tuple = namedProposalTuple(raw);
+  const status = namedProposalStatus(rawStatus);
+  return {
+    id: `${dao}-proposal-${proposalId}`,
+    proposalId,
+    prevProposalId: tuple.prevProposalId,
+    sponsored: Number(tuple.votingStarts || '0') > 0,
+    processed: Boolean(status.processed),
+    cancelled: Boolean(status.cancelled),
+    passed: Boolean(status.passed),
+    actionFailed: Boolean(status.actionFailed),
+    votingStarts: tuple.votingStarts,
+    votingEnds: tuple.votingEnds,
+    graceEnds: tuple.graceEnds,
+    expiration: tuple.expiration,
+    yesVotes: tuple.yesVotes,
+    noVotes: tuple.noVotes,
+    title: `Proposal ${proposalId}`,
+    proposalType: 'UNKNOWN_CHAIN_ONLY',
+    chainState: Number(state),
   };
 }
 
@@ -315,6 +367,14 @@ function compactProposal(proposal: IndexedProposal) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function compactError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const schemaMessages = Array.from(raw.matchAll(/Type `[^`]+` has no field `[^`]+`/g)).map((match) => match[0]);
+  if (schemaMessages.length) return Array.from(new Set(schemaMessages)).join('; ');
+  const firstLine = raw.split('\n').find((line) => line.trim());
+  return (firstLine || raw).slice(0, 500);
 }
 
 type IndexedProposal = Record<string, unknown> & {

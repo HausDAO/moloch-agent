@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDaoMetaTx, buildMemoryPostTx, buildMintSharesTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits } from '../src/tx.js';
+import { buildCancelTx, buildDaoMetaTx, buildMemoryPostTx, buildMintSharesTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
 
@@ -20,6 +20,15 @@ test('buildSponsorTx creates sponsor transaction summary', () => {
   assert.equal(built.tx.to, dao);
   assert.match(built.tx.data, /^0x/);
   assert.equal(built.summary.action, 'sponsor');
+});
+
+test('buildCancelTx creates cancel transaction summary', () => {
+  const built = buildCancelTx({ chainId: 8453, dao, proposal: 12 });
+
+  assert.equal(built.tx.to, dao);
+  assert.match(built.tx.data, /^0x/);
+  assert.equal(built.summary.action, 'cancel');
+  assert.equal(built.summary.proposalId, 12);
 });
 
 test('buildMemoryPostTx uses community memory defaults', () => {
