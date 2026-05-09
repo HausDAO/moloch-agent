@@ -1,4 +1,4 @@
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, formatEther, formatUnits, http } from 'viem';
 import { base } from 'viem/chains';
 import type { Config } from './config.js';
 import type { ServiceClient } from './service.js';
@@ -9,6 +9,12 @@ export const STATE_NAMES = ['unborn', 'submitted', 'voting', 'cancelled', 'grace
 const PREV_PROCESS_ELIGIBLE = new Set([0, 3, 6, 7]);
 const PROCESS_PROPOSAL_GAS_LIMIT_ADDITION = 400000n;
 const DEFAULT_PROCESS_GAS_LIMIT = 800000n;
+
+const ERC20_ABI = [
+  { type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+  { type: 'function', name: 'symbol', stateMutability: 'view', inputs: [], outputs: [{ type: 'string' }] },
+] as const;
 
 export async function readDaoDirect(config: Config, dao: `0x${string}`): Promise<Record<string, unknown>> {
   const client = publicClient(config);
@@ -42,6 +48,51 @@ export async function readProposalDirect(config: Config, dao: `0x${string}`, pro
     state: Number(state),
     stateName: STATE_NAMES[Number(state)] || `unknown-${state}`,
   };
+}
+
+export async function readBalances(input: {
+  config: Config;
+  service: ServiceClient;
+  dao?: `0x${string}`;
+  address?: `0x${string}`;
+  token?: `0x${string}`;
+}): Promise<Record<string, unknown>> {
+  const client = publicClient(input.config);
+  let safeAddress: `0x${string}` | undefined;
+  if (!input.address && input.dao) {
+    safeAddress = await safeAddressForDao(input.service, input.dao);
+  }
+  const address = input.address || safeAddress;
+  if (!address) throw new Error('Provide --address, or provide --dao for DAO Safe balance lookup.');
+  const wei = await client.getBalance({ address });
+  const result: Record<string, unknown> = {
+    chainId: input.config.chainId,
+    dao: input.dao || '',
+    safeAddress: safeAddress || '',
+    address,
+    native: {
+      symbol: 'ETH',
+      wei: wei.toString(),
+      eth: formatEther(wei),
+    },
+    explorerUrl: `${explorerBaseUrl(input.config.chainId)}/address/${address}`,
+  };
+  if (input.token) {
+    const [rawBalance, decimals, symbol] = await Promise.all([
+      client.readContract({ address: input.token, abi: ERC20_ABI, functionName: 'balanceOf', args: [address] }),
+      client.readContract({ address: input.token, abi: ERC20_ABI, functionName: 'decimals' }),
+      client.readContract({ address: input.token, abi: ERC20_ABI, functionName: 'symbol' }),
+    ]);
+    result.erc20 = {
+      token: input.token,
+      symbol,
+      decimals,
+      raw: rawBalance.toString(),
+      formatted: formatUnits(rawBalance, decimals),
+      explorerUrl: `${explorerBaseUrl(input.config.chainId)}/token/${input.token}?a=${address}`,
+    };
+  }
+  return result;
 }
 
 export async function proposalLifecycle(input: {
@@ -177,6 +228,20 @@ function publicClient(config: Config) {
   if (!config.rpcUrl) throw new Error('RPC_URL is required for direct chain reads.');
   if (config.chainId !== 8453) throw new Error('Only Base chainId 8453 is currently supported for direct chain reads.');
   return createPublicClient({ chain: base, transport: http(config.rpcUrl) });
+}
+
+async function safeAddressForDao(service: ServiceClient, dao: `0x${string}`): Promise<`0x${string}`> {
+  const indexed = await service.dao({ dao });
+  if (isRecord(indexed) && isRecord(indexed.dao) && typeof indexed.dao.safeAddress === 'string') {
+    return indexed.dao.safeAddress.toLowerCase() as `0x${string}`;
+  }
+  throw new Error('Could not resolve DAO Safe address from indexed DAO data. Pass --address 0xSAFE.');
+}
+
+function explorerBaseUrl(chainId: number): string {
+  if (chainId === 8453) return 'https://basescan.org';
+  if (chainId === 1) return 'https://etherscan.io';
+  return 'https://basescan.org';
 }
 
 async function chainProposalContext(config: Config, dao: `0x${string}`, proposal: IndexedProposal): Promise<Record<string, unknown>> {

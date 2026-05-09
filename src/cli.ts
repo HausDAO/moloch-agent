@@ -5,7 +5,7 @@ import { helpText } from './help.js';
 import { getConfig, type Config } from './config.js';
 import { createServiceClient, type ServiceClient } from './service.js';
 import { printCompact, printJson } from './output.js';
-import { buildOldestReadyProcessTx, processQueue, proposalLifecycle, readDaoDirect, readProposalDirect } from './chain.js';
+import { buildOldestReadyProcessTx, processQueue, proposalLifecycle, readBalances, readDaoDirect, readProposalDirect } from './chain.js';
 import {
   asAddress,
   asHex,
@@ -85,6 +85,17 @@ async function main() {
 
     case 'read-dao':
       output = await readDaoDirect(config, asAddress(requiredFlag(parsed.flags, 'dao')));
+      break;
+
+    case 'balances':
+    case 'balance':
+      output = await readBalances({
+        config,
+        service,
+        dao: optionalAddress(parsed.flags, 'dao'),
+        address: optionalAddress(parsed.flags, 'address'),
+        token: optionalAddress(parsed.flags, 'token'),
+      });
       break;
 
     case 'read-proposal':
@@ -463,6 +474,11 @@ function parseBool(value: string): boolean {
 function optionalBigint(flags: Record<string, string | boolean>, name: string): bigint | undefined {
   const value = stringFlag(flags, name);
   return value == null ? undefined : parseBigint(value);
+}
+
+function optionalAddress(flags: Record<string, string | boolean>, name: string): `0x${string}` | undefined {
+  const value = stringFlag(flags, name);
+  return value == null ? undefined : asAddress(value);
 }
 
 function listFlag(value: string): string[] {
