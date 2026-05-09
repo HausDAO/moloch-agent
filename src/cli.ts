@@ -287,7 +287,7 @@ async function main() {
       throw new Error(`Unknown command: ${parsed.command}\n\n${helpText}`);
   }
 
-  const printable = full ? output : summarizeTxOutput(output);
+  const printable = full ? output : summarizeOutput(output);
   if (compact) printCompact(printable);
   else printJson(printable);
 }
@@ -475,7 +475,7 @@ function parseAmountList(flags: Record<string, string | boolean>): bigint[] {
   return listFlag(amount).map(parseBaalTokenUnits);
 }
 
-function summarizeTxOutput(value: unknown): unknown {
+function summarizeOutput(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
   if ('summary' in value) {
     const result = value as { summary: Record<string, unknown>; sent?: boolean; hash?: string };
@@ -488,7 +488,7 @@ function summarizeTxOutput(value: unknown): unknown {
       note: 'Use --full to print unsigned transaction calldata.',
     };
   }
-  return value;
+  return stripLargeFields(value);
 }
 
 type WorkspaceKind = 'dao' | 'proposal';
@@ -519,4 +519,15 @@ type WorkspaceResult = PinResult & {
 
 function compactObject<T extends Record<string, unknown>>(value: T): Record<string, unknown> {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined && item !== null && item !== ''));
+}
+
+function stripLargeFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripLargeFields);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => {
+    if ((key === 'data' || key === 'proposalData') && typeof item === 'string' && item.startsWith('0x') && item.length > 80) {
+      return [key, `${item.slice(0, 42)}...${item.slice(-8)}`];
+    }
+    return [key, stripLargeFields(item)];
+  }));
 }
