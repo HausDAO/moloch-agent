@@ -431,8 +431,7 @@ async function proposalLink(
 ): Promise<string> {
   const explicit = stringFlag(flags, 'link') || stringFlag(flags, 'content-uri');
   if (explicit || flags['no-workspace']) return explicit || '';
-  const title = stringFlag(flags, 'title');
-  if (!title) return '';
+  const title = stringFlag(flags, 'title') || `${proposalKind} proposal workspace`;
   const workspace = await createWorkspace(service, {
     config,
     kind: 'proposal',
@@ -451,7 +450,8 @@ async function summonParamsWithWorkspace(
   params: SummonParams,
   noWorkspace: boolean,
 ): Promise<SummonParams> {
-  if (noWorkspace || params.communityMemoryURI || params.proposalWorkspaceURI || params.sharedStateURI) return params;
+  if (noWorkspace) return params;
+  if (params.communityMemoryURI && params.proposalWorkspaceURI && params.sharedStateURI) return params;
   const workspace = await createWorkspace(service, {
     config,
     kind: 'dao',
@@ -462,9 +462,9 @@ async function summonParamsWithWorkspace(
   latestWorkspace = workspace;
   return {
     ...params,
-    communityMemoryURI: workspace.uri,
-    proposalWorkspaceURI: workspace.uri,
-    sharedStateURI: workspace.uri,
+    communityMemoryURI: params.communityMemoryURI || workspace.uri,
+    proposalWorkspaceURI: params.proposalWorkspaceURI || workspace.uri,
+    sharedStateURI: params.sharedStateURI || workspace.uri,
   };
 }
 

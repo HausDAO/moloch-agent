@@ -139,9 +139,11 @@ Minimal summon params:
 
 Summon share, loot, offering, and sponsor threshold values are raw integer base units. Percent fields are whole-number percentages.
 
-If `communityMemoryURI`, `proposalWorkspaceURI`, and `sharedStateURI` are omitted, `summon` pins a starter DAO workspace and includes its `ipfs://...` URI in summon metadata.
+If any of `communityMemoryURI`, `proposalWorkspaceURI`, or `sharedStateURI` are omitted, `summon` pins a starter DAO workspace and fills the missing metadata pointers with its `ipfs://...` URI.
 
-Proposal commands (`signal`, `dao-meta`, `gov-settings`, `token-settings`, `custom-proposal`, `join-dao`, `tribute`, `swap`, `payment`, `mint-shares`, `mint-loot`) pin a proposal workspace automatically when no `--link` or `--content-uri` is supplied. Proposal links use `ipfs://...` by default. Set `IPFS_GATEWAY_URL` when a browser gateway URL should be used instead.
+Proposal commands (`signal`, `dao-meta`, `gov-settings`, `token-settings`, `custom-proposal`, `join-dao`, `tribute`, `swap`, `payment`, `mint-shares`, `mint-loot`) pin a proposal workspace automatically and put that URI in proposal details when no `--link` or `--content-uri` is supplied. Proposal links use `ipfs://...` by default. Set `IPFS_GATEWAY_URL` when a browser gateway URL should be used instead.
+
+Agents should normally omit `--link` and `--content-uri` so the CLI can create the proposal workspace. Use those flags only when passing an already-pinned workspace URI.
 
 `gov-settings` reads a JSON file with `votingPeriodInSeconds`, `gracePeriodInSeconds`, `newOffering`, `quorum`, `sponsorThreshold`, and `minRetention`. `quorum` and `minRetention` are whole-number percentages.
 
