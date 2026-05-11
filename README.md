@@ -170,6 +170,8 @@ For native ETH-to-shares flows, use WETH: run `wrap-eth --amount 0.01`, approve 
 
 `vote --reason` posts a `vote-reason` memory record linked to the proposal, then submits the vote transaction. The CLI reads the proposal `contentURI` when available and includes it as `workspaceURI` on the memory record.
 
+Transaction commands wait for receipts by default before returning. This reduces stale nonce races when agents run back-to-back writes such as sponsor then vote, or vote-reason then vote. Set `MOLOCH_WAIT_DEFAULT=false` only for fire-and-forget operation.
+
 Use `moloch-agent account` to print the exact signer address derived from `PRIVATE_KEY`. Never expand shortened addresses such as `0x1234...abcd`; use only full addresses from `account`, environment variables, chain reads, or explicit user input.
 
 DAOhaus admin URL helper:
