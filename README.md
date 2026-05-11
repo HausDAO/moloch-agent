@@ -108,7 +108,7 @@ moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --token 0xERC20 --amount 10
 moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1
 moloch-agent mint-loot --dao 0xDAO --to 0xMEMBER --amount 100
 moloch-agent sponsor --dao 0xDAO --proposal 1
-moloch-agent vote --dao 0xDAO --proposal 1 --approved true
+moloch-agent vote --dao 0xDAO --proposal 1 --approved true --reason "Aligned with the current mandate."
 moloch-agent cancel --dao 0xDAO --proposal 1
 moloch-agent process --dao 0xDAO --proposal 1 --proposal-data 0x...
 moloch-agent process-ready --dao 0xDAO
@@ -156,6 +156,8 @@ Agents should normally omit `--link` and `--content-uri` so the CLI can create t
 `payment` creates a treasury transfer proposal. Without `--token`, `--amount` is a human ETH decimal. With `--token`, pass either raw token units with `--amount-raw` or provide `--decimals` so the CLI can parse human token units.
 
 `mint-shares` creates a direct voting-share issuance proposal. `mint-loot` creates a direct non-voting loot issuance proposal. Both use human 18-decimal DAO token units by default; use `--amount-raw` only for exact base units.
+
+`vote --reason` posts a `vote-reason` memory record linked to the proposal, then submits the vote transaction. The CLI reads the proposal `contentURI` when available and includes it as `workspaceURI` on the memory record.
 
 DAOhaus admin URL helper:
 

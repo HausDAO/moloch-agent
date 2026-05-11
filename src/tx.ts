@@ -208,6 +208,7 @@ export function buildMemoryPostTx(input: {
   draftId?: string;
   title?: string;
   body?: string;
+  vote?: string;
   contentURI?: string;
   contentHash?: string;
   workspaceURI?: string;
@@ -224,6 +225,7 @@ export function buildMemoryPostTx(input: {
     type: input.type || 'thread-post',
     title: input.title,
     body: input.body,
+    vote: input.vote,
     threadId: input.threadId || input.topicId,
     topicId: input.topicId,
     proposalId: input.proposalId,

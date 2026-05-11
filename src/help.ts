@@ -34,7 +34,7 @@ Usage:
   moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1 [--build-only]
   moloch-agent mint-loot --dao 0xDAO --to 0xMEMBER --amount 100 [--build-only]
   moloch-agent sponsor --dao 0xDAO --proposal 1 [--build-only]
-  moloch-agent vote --dao 0xDAO --proposal 1 --approved true [--build-only]
+  moloch-agent vote --dao 0xDAO --proposal 1 --approved true [--reason "..."] [--build-only]
   moloch-agent cancel --dao 0xDAO --proposal 1 [--build-only]
   moloch-agent process --dao 0xDAO --proposal 1 --proposal-data 0x... [--gas-limit 1200000] [--build-only]
   moloch-agent process-ready --dao 0xDAO [--first 100] [--build-only]
@@ -53,6 +53,7 @@ Notes:
   Transaction commands broadcast by default. Use --build-only for unsigned transaction JSON.
   The default public Base RPC is best-effort and can rate limit; set RPC_URL for reliable autonomous operation.
   Transaction commands print summaries by default; use --full for calldata.
+  vote --reason posts a vote-reason memory record, then submits the vote.
   summon auto-pins a DAO workspace when metadata pointers are not provided.
   proposal commands auto-pin a proposal workspace when --link/--content-uri is not provided.
   Workspace links default to ipfs:// URIs. Set IPFS_GATEWAY_URL only when browser gateway links are preferred.

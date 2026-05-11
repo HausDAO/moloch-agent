@@ -173,12 +173,7 @@ async function main() {
       break;
 
     case 'vote':
-      output = await maybeSend(config, buildVoteTx({
-        chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
-        proposal: asProposalId(requiredFlag(parsed.flags, 'proposal')),
-        approved: parseBool(requiredFlag(parsed.flags, 'approved')),
-      }), send);
+      output = await voteWithOptionalReason(config, service, parsed.flags, send);
       break;
 
     case 'sponsor':
@@ -229,6 +224,7 @@ async function main() {
         draftId: stringFlag(parsed.flags, 'draft-id'),
         title: stringFlag(parsed.flags, 'title'),
         body: stringFlag(parsed.flags, 'body') || stringFlag(parsed.flags, 'description'),
+        vote: stringFlag(parsed.flags, 'vote'),
         contentURI: stringFlag(parsed.flags, 'content-uri') || stringFlag(parsed.flags, 'link'),
         contentHash: stringFlag(parsed.flags, 'content-hash'),
         workspaceURI: stringFlag(parsed.flags, 'workspace-uri'),
@@ -509,6 +505,76 @@ async function createWorkspace(service: ServiceClient, input: WorkspaceInput): P
     link,
     workspace,
   };
+}
+
+async function voteWithOptionalReason(
+  config: Config,
+  service: ServiceClient,
+  flags: Record<string, string | boolean>,
+  send: boolean,
+): Promise<unknown> {
+  const dao = asAddress(requiredFlag(flags, 'dao'));
+  const proposal = asProposalId(requiredFlag(flags, 'proposal'));
+  const approved = parseBool(requiredFlag(flags, 'approved'));
+  const reason = stringFlag(flags, 'reason');
+  const voteTx = buildVoteTx({
+    chainId: config.chainId,
+    dao,
+    proposal,
+    approved,
+  });
+
+  if (!reason) return maybeSend(config, voteTx, send);
+
+  const workspaceURI = stringFlag(flags, 'workspace-uri') || await proposalContentURI(service, dao, proposal);
+  const reasonTx = buildMemoryPostTx({
+    chainId: config.chainId,
+    dao,
+    table: 'communityMemory',
+    type: 'vote-reason',
+    threadId: stringFlag(flags, 'thread-id') || `proposal-${proposal}-vote-reasons`,
+    proposalId: String(proposal),
+    title: stringFlag(flags, 'reason-title') || `Vote ${approved ? 'yes' : 'no'} on proposal ${proposal}`,
+    body: reason,
+    vote: approved ? 'yes' : 'no',
+    workspaceURI,
+    agent: stringFlag(flags, 'agent'),
+  });
+
+  const reasonResult = await maybeSend(config, reasonTx, send);
+  const voteResult = await maybeSend(config, voteTx, send);
+  return {
+    action: 'vote-with-reason',
+    reason: reasonResult,
+    vote: voteResult,
+  };
+}
+
+async function proposalContentURI(service: ServiceClient, dao: `0x${string}`, proposal: number): Promise<string | undefined> {
+  try {
+    const value = await service.proposal({ dao, proposal: String(proposal) });
+    return findStringField(value, 'contentURI');
+  } catch {
+    return undefined;
+  }
+}
+
+function findStringField(value: unknown, key: string): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findStringField(item, key);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record[key] === 'string' && record[key]) return record[key] as string;
+  for (const item of Object.values(record)) {
+    const found = findStringField(item, key);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 function attachWorkspace<T extends BuiltTx>(built: T, workspace?: WorkspaceResult): T {

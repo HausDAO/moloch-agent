@@ -45,6 +45,24 @@ test('buildMemoryPostTx uses community memory defaults', () => {
   assert.equal(built.summary.threadId, 'proposal-12');
 });
 
+test('buildMemoryPostTx can encode vote reasons', () => {
+  const built = buildMemoryPostTx({
+    chainId: 8453,
+    dao,
+    table: 'communityMemory',
+    type: 'vote-reason',
+    proposalId: '12',
+    threadId: 'proposal-12-vote-reasons',
+    body: 'I voted no because the ask needs clearer scope.',
+    vote: 'no',
+    workspaceURI: 'ipfs://workspace',
+  });
+
+  assert.equal(built.summary.recordTable, 'communityMemory');
+  assert.equal(built.summary.type, 'vote-reason');
+  assert.equal(built.summary.proposalId, '12');
+});
+
 test('buildSignalTx creates submitProposal transaction', () => {
   const built = buildSignalTx({
     chainId: 8453,
