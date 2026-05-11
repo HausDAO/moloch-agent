@@ -86,11 +86,13 @@ moloch-agent links --dao 0xDAO --address 0xCONTRACT --tx 0xHASH
 moloch-agent read-dao --dao 0xDAO
 moloch-agent balances --dao 0xDAO
 moloch-agent balances --address 0xADDRESS --token 0xERC20
+moloch-agent treasury-tokens --dao 0xDAO
 moloch-agent read-proposal --dao 0xDAO --proposal 1
 moloch-agent proposal-lifecycle --dao 0xDAO --proposal 1
 moloch-agent process-queue --dao 0xDAO
 moloch-agent wrap-eth --amount 0.01
 moloch-agent approve-token --token 0xERC20 --amount 1000000
+moloch-agent ragequit --dao 0xDAO --to 0xRECIPIENT --shares 1 --loot 0 --tokens ETH,0xERC20
 moloch-agent members --dao 0xDAO
 moloch-agent records --dao 0xDAO --table communityMemory
 moloch-agent pin-json --file community-state.json --name community-state-v1
@@ -161,6 +163,8 @@ Proposal commands read the DAO `proposalOffering` and include it as transaction 
 For native ETH-to-shares flows, use WETH: run `wrap-eth --amount 0.01`, approve the Tribute Minion with `approve-token --token 0x4200000000000000000000000000000000000006 --amount 0.01`, then run `tribute` / `join-dao` / `swap` with that WETH token address. `approve-token` defaults spender to the DAOhaus Tribute Minion and token to Base WETH; pass `--amount-raw` or `--decimals` for non-WETH ERC-20 units.
 
 `payment` creates a treasury transfer proposal. Without `--token`, `--amount` is a human ETH decimal. With `--token`, pass either raw token units with `--amount-raw` or provide `--decimals` so the CLI can parse human token units.
+
+`ragequit` is a direct member action, not a proposal. It burns the caller's shares and/or loot and claims proportional treasury assets to `--to`. The `--tokens` list must be sorted ascending as Baal requires. Run `treasury-tokens --dao 0xDAO` and use `ragequitTokensCsv` as the `--tokens` value. Use `ETH` or `NATIVE` for Baal's native ETH sentinel when building a token list manually.
 
 `mint-shares` creates a direct voting-share issuance proposal. `mint-loot` creates a direct non-voting loot issuance proposal. Both use human 18-decimal DAO token units by default; use `--amount-raw` only for exact base units.
 

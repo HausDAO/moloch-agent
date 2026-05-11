@@ -5,11 +5,12 @@ import { helpText } from './help.js';
 import { getConfig, type Config } from './config.js';
 import { createServiceClient, type ServiceClient } from './service.js';
 import { printCompact, printJson } from './output.js';
-import { buildOldestReadyProcessTx, processQueue, proposalLifecycle, readBalances, readDaoDirect, readProposalDirect } from './chain.js';
+import { buildOldestReadyProcessTx, processQueue, proposalLifecycle, readBalances, readDaoDirect, readProposalDirect, readTreasuryTokens } from './chain.js';
 import {
   asAddress,
   asHex,
   asProposalId,
+  BAAL_ETH_TOKEN,
   BASE_WETH,
   buildApproveTokenTx,
   buildCancelTx,
@@ -21,6 +22,7 @@ import {
   buildMintSharesTx,
   buildPaymentTx,
   buildProcessTx,
+  buildRagequitTx,
   buildSignalTx,
   buildSponsorTx,
   buildSummonTx,
@@ -113,6 +115,15 @@ async function main() {
         dao: optionalAddress(parsed.flags, 'dao'),
         address: optionalAddress(parsed.flags, 'address'),
         token: optionalAddress(parsed.flags, 'token'),
+      });
+      break;
+
+    case 'treasury-tokens':
+    case 'ragequit-tokens':
+      output = await readTreasuryTokens({
+        config,
+        service,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
       });
       break;
 
@@ -247,6 +258,18 @@ async function main() {
         token: optionalAddress(parsed.flags, 'token') || BASE_WETH,
         spender: optionalAddress(parsed.flags, 'spender'),
         amount: parseApprovalAmount(parsed.flags),
+      }), send);
+      break;
+
+    case 'ragequit':
+    case 'rage-quit':
+      output = await maybeSend(config, buildRagequitTx({
+        chainId: config.chainId,
+        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        to: asAddress(requiredFlag(parsed.flags, 'to')),
+        sharesToBurn: optionalBigint(parsed.flags, 'shares-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'shares', '0') || '0'),
+        lootToBurn: optionalBigint(parsed.flags, 'loot-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'loot', '0') || '0'),
+        tokens: parseRagequitTokens(requiredFlag(parsed.flags, 'tokens')),
       }), send);
       break;
 
@@ -722,8 +745,8 @@ function parseTributeAmount(flags: Record<string, string | boolean>): bigint {
   if (raw) return parseBigint(raw);
   const amount = stringFlag(flags, 'amount', '0') || '0';
   const token = stringFlag(flags, 'token', 'ETH') || 'ETH';
-  if (/^(ETH|NATIVE)$/i.test(token) || token.toLowerCase() === '0x0000000000000000000000000000000000000000') {
-    throw new Error('Tribute/swap proposals require a nonzero ERC-20 --token address. Native ETH and 0x0000000000000000000000000000000000000000 tribute are not supported by the DAOhaus Tribute Minion.');
+  if (/^(ETH|NATIVE)$/i.test(token) || token.toLowerCase() === '0x0000000000000000000000000000000000000000' || token.toLowerCase() === BAAL_ETH_TOKEN.toLowerCase()) {
+    throw new Error('Tribute/swap proposals require a nonzero ERC-20 --token address. Native ETH, Baal ETH sentinel, and 0x0000000000000000000000000000000000000000 tribute are not supported by the DAOhaus Tribute Minion.');
   }
   return parseBigint(amount);
 }
@@ -747,6 +770,18 @@ function parseApprovalAmount(flags: Record<string, string | boolean>): bigint {
   const amount = requiredFlag(flags, 'amount');
   const decimals = stringFlag(flags, 'decimals');
   return decimals ? parseTokenUnits(amount, Number(decimals)) : parseNativeTokenAmount(amount);
+}
+
+function parseRagequitTokens(value: string): `0x${string}`[] {
+  const tokens = listFlag(value).map((token) => {
+    if (/^(ETH|NATIVE)$/i.test(token)) return BAAL_ETH_TOKEN as `0x${string}`;
+    return asAddress(token);
+  });
+  const sorted = [...tokens].sort((a, b) => BigInt(a.toLowerCase()) < BigInt(b.toLowerCase()) ? -1 : 1);
+  if (tokens.some((token, index) => token.toLowerCase() !== sorted[index].toLowerCase())) {
+    throw new Error('Baal ragequit token list must be sorted ascending. Use ETH/NATIVE for the Baal ETH sentinel.');
+  }
+  return tokens;
 }
 
 function summarizeOutput(value: unknown): unknown {

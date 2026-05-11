@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BASE_WETH, buildApproveTokenTx, buildCancelTx, buildCustomProposalTx, buildDaoMetaTx, buildGovernanceSettingsTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTokenSettingsTx, buildTributeTx, buildUnwrapEthTx, buildVoteTx, buildWrapEthTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits, signerAccount } from '../src/tx.js';
+import { BAAL_ETH_TOKEN, BASE_WETH, buildApproveTokenTx, buildCancelTx, buildCustomProposalTx, buildDaoMetaTx, buildGovernanceSettingsTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildRagequitTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTokenSettingsTx, buildTributeTx, buildUnwrapEthTx, buildVoteTx, buildWrapEthTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits, signerAccount } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
 
@@ -125,7 +125,7 @@ test('buildTributeTx rejects native ETH tribute', () => {
     dao,
     token: 'ETH',
     amount: 10n,
-  }), /Native ETH and 0x0000000000000000000000000000000000000000 tribute are not supported/);
+  }), /Native ETH, Baal ETH sentinel, and 0x0000000000000000000000000000000000000000 tribute are not supported/);
 });
 
 test('buildTributeTx rejects zero-address tribute token', () => {
@@ -135,6 +135,15 @@ test('buildTributeTx rejects zero-address tribute token', () => {
     token: '0x0000000000000000000000000000000000000000',
     amount: 10n,
   }), /nonzero ERC-20 token address/);
+});
+
+test('buildTributeTx rejects Baal ETH sentinel tribute token', () => {
+  assert.throws(() => buildTributeTx({
+    chainId: 8453,
+    dao,
+    token: BAAL_ETH_TOKEN,
+    amount: 10n,
+  }), /Baal ETH sentinel/);
 });
 
 test('buildWrapEthTx creates Base WETH deposit transaction', () => {
@@ -164,6 +173,22 @@ test('buildApproveTokenTx defaults spender to Tribute Minion', () => {
   assert.equal(built.tx.value, '0');
   assert.equal(built.summary.action, 'approve-token');
   assert.equal(built.summary.spender, '0x00768B047f73D88b6e9c14bcA97221d6E179d468');
+});
+
+test('buildRagequitTx creates direct member ragequit transaction', () => {
+  const built = buildRagequitTx({
+    chainId: 8453,
+    dao,
+    to: dao,
+    sharesToBurn: parseBaalTokenUnits('1'),
+    lootToBurn: 0n,
+    tokens: [BAAL_ETH_TOKEN],
+  });
+
+  assert.equal(built.tx.to, dao);
+  assert.equal(built.tx.value, '0');
+  assert.equal(built.summary.action, 'ragequit');
+  assert.deepEqual(built.summary.tokens, [BAAL_ETH_TOKEN]);
 });
 
 test('parseNativeTokenAmount accepts decimal ETH amounts', () => {

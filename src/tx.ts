@@ -20,6 +20,7 @@ export const TRIBUTE_MINION = '0x00768B047f73D88b6e9c14bcA97221d6E179d468';
 export const GNOSIS_MULTISEND = '0x998739BFdAAdde7C933B942a68053933098f9EDa';
 export const SUMMONER = '0x97Aaa5be8B38795245f1c38A883B44cccdfB3E11';
 export const BASE_WETH = '0x4200000000000000000000000000000000000006';
+export const BAAL_ETH_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 export const POSTER_TAG_DAO_DB = 'daohaus.proposal.database';
 export const POSTER_TAG_MEMBER_DB = 'daohaus.member.database';
 export const POSTER_TAG_DAO_PROFILE_UPDATE = 'daohaus.shares.daoProfile';
@@ -36,6 +37,7 @@ export const BAAL_ABI = [
   { type: 'function', name: 'mintLoot', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address[]' }, { name: 'amount', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'setGovernanceConfig', stateMutability: 'nonpayable', inputs: [{ name: '_governanceConfig', type: 'bytes' }], outputs: [] },
   { type: 'function', name: 'setAdminConfig', stateMutability: 'nonpayable', inputs: [{ name: 'pauseShares', type: 'bool' }, { name: 'pauseLoot', type: 'bool' }], outputs: [] },
+  { type: 'function', name: 'ragequit', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'sharesToBurn', type: 'uint256' }, { name: 'lootToBurn', type: 'uint256' }, { name: 'tokens', type: 'address[]' }], outputs: [] },
   { type: 'function', name: 'setShamans', stateMutability: 'nonpayable', inputs: [{ name: '_shamans', type: 'address[]' }, { name: '_permissions', type: 'uint256[]' }], outputs: [] },
   { type: 'function', name: 'executeAsBaal', stateMutability: 'nonpayable', inputs: [{ name: '_to', type: 'address' }, { name: '_value', type: 'uint256' }, { name: '_data', type: 'bytes' }], outputs: [] },
   { type: 'function', name: 'proposalCount', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint32' }] },
@@ -199,6 +201,30 @@ export function buildApproveTokenTx(input: { chainId: number; token: `0x${string
     spender,
     amount: input.amount.toString(),
     note: 'Approves ERC-20 spending. Tribute Minion needs allowance before token-for-shares/loot proposals can be submitted.',
+  });
+}
+
+export function buildRagequitTx(input: {
+  chainId: number;
+  dao: `0x${string}`;
+  to: `0x${string}`;
+  sharesToBurn: bigint;
+  lootToBurn: bigint;
+  tokens: `0x${string}`[];
+}): BuiltTx {
+  const data = encodeFunctionData({
+    abi: BAAL_ABI,
+    functionName: 'ragequit',
+    args: [input.to, input.sharesToBurn, input.lootToBurn, input.tokens],
+  });
+  return withSummary(tx(input.chainId, input.dao, data), {
+    action: 'ragequit',
+    dao: input.dao,
+    to: input.to,
+    sharesToBurn: input.sharesToBurn.toString(),
+    lootToBurn: input.lootToBurn.toString(),
+    tokens: input.tokens,
+    note: 'Direct member action. Burns caller shares/loot and claims proportional treasury assets. Token list must be sorted ascending for Baal.',
   });
 }
 
@@ -435,8 +461,8 @@ export function buildTributeTx(input: {
   const description = input.description || '';
   const link = input.link || '';
   const token = normalizeToken(input.token || 'ETH');
-  if (token === ZERO_ADDRESS) {
-    throw new Error('Tribute/swap proposals require a nonzero ERC-20 token address. Native ETH and 0x0000000000000000000000000000000000000000 tribute are not supported by the DAOhaus Tribute Minion.');
+  if (token === ZERO_ADDRESS || token.toLowerCase() === BAAL_ETH_TOKEN.toLowerCase()) {
+    throw new Error('Tribute/swap proposals require a nonzero ERC-20 token address. Native ETH, Baal ETH sentinel, and 0x0000000000000000000000000000000000000000 tribute are not supported by the DAOhaus Tribute Minion.');
   }
   const amount = input.amount || 0n;
   const shares = input.shares || 0n;
@@ -817,6 +843,7 @@ export function parseTokenUnits(value: string, decimals: number): bigint {
 
 export function normalizeToken(value: string): `0x${string}` {
   if (!value || value.toUpperCase() === 'ETH' || value.toUpperCase() === 'NATIVE') return ZERO_ADDRESS;
+  if (value.toLowerCase() === BAAL_ETH_TOKEN.toLowerCase()) return BAAL_ETH_TOKEN;
   return asAddress(value);
 }
 

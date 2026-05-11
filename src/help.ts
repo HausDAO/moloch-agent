@@ -12,11 +12,13 @@ Usage:
   moloch-agent read-dao --dao 0xDAO
   moloch-agent balances --dao 0xDAO [--token 0xERC20]
   moloch-agent balances --address 0xADDRESS [--token 0xERC20]
+  moloch-agent treasury-tokens --dao 0xDAO
   moloch-agent read-proposal --dao 0xDAO --proposal 1
   moloch-agent proposal-lifecycle --dao 0xDAO --proposal 1
   moloch-agent process-queue --dao 0xDAO [--first 100]
   moloch-agent wrap-eth --amount 0.01 [--build-only]
   moloch-agent approve-token --token 0xERC20 --amount 1000000 --spender 0xSPENDER [--build-only]
+  moloch-agent ragequit --dao 0xDAO --to 0xRECIPIENT --shares 1 --loot 0 --tokens ETH,0xERC20 [--build-only]
   moloch-agent members --dao 0xDAO [--first 100] [--skip 0]
   moloch-agent records --dao 0xDAO [--table communityMemory] [--first 100] [--skip 0]
   moloch-agent pin-json --file artifact.json [--name artifact-name]
@@ -70,6 +72,8 @@ Notes:
   For native ETH-to-shares flows, wrap ETH to Base WETH, approve Tribute Minion, then use tribute/join/swap with --token 0x4200000000000000000000000000000000000006.
   approve-token defaults spender to the DAOhaus Tribute Minion and token to Base WETH. Use --amount-raw or --decimals for non-WETH ERC-20s.
   payment sends ETH from the DAO treasury with decimal ETH; ERC-20 payment requires --amount-raw or --decimals.
+  treasury-tokens returns a sorted ragequitTokensCsv value for the DAO Safe.
+  ragequit is a direct member action, not a proposal. It burns caller shares/loot and claims proportional treasury assets. Tokens must be sorted ascending; ETH maps to Baal's ETH sentinel.
   mint-shares and mint-loot use human 18-decimal DAO token units by default.
   process-queue never trusts indexed passed=true as the execution gate; RPC state is used when available.
   process-ready selects the oldest ready proposal and includes a gas limit based on proposal baalGas when available.

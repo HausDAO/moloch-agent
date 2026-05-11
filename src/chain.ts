@@ -1,8 +1,8 @@
-import { createPublicClient, formatEther, formatUnits, http } from 'viem';
+import { createPublicClient, formatEther, formatUnits, getAddress, http } from 'viem';
 import { base } from 'viem/chains';
 import type { Config } from './config.js';
 import type { ServiceClient } from './service.js';
-import { BAAL_ABI, type BuiltTx } from './tx.js';
+import { BAAL_ABI, BAAL_ETH_TOKEN, type BuiltTx } from './tx.js';
 import { buildProcessTx } from './tx.js';
 
 export const STATE_NAMES = ['unborn', 'submitted', 'voting', 'cancelled', 'grace', 'ready', 'processed', 'defeated'];
@@ -93,6 +93,35 @@ export async function readBalances(input: {
     };
   }
   return result;
+}
+
+export async function readTreasuryTokens(input: {
+  config: Config;
+  service: ServiceClient;
+  dao: `0x${string}`;
+}): Promise<Record<string, unknown>> {
+  const safeAddress = await safeAddressForDao(input.service, input.dao);
+  const balances = await safeBalances(input.config.chainId, safeAddress);
+  const tokens = balances
+    .filter((item) => BigInt(String(item.balance || '0')) > 0n)
+    .map((item) => ({
+      tokenAddress: item.tokenAddress || BAAL_ETH_TOKEN,
+      symbol: item.token?.symbol || (item.tokenAddress ? '' : 'ETH'),
+      name: item.token?.name || (item.tokenAddress ? '' : 'Ether'),
+      decimals: item.token?.decimals,
+      balance: item.balance,
+    }));
+  const ragequitTokens = tokens
+    .map((item) => item.tokenAddress)
+    .sort((a, b) => BigInt(a.toLowerCase()) < BigInt(b.toLowerCase()) ? -1 : 1);
+  return {
+    dao: input.dao,
+    safeAddress,
+    tokens,
+    ragequitTokens,
+    ragequitTokensCsv: ragequitTokens.join(','),
+    note: 'Use ragequitTokensCsv as --tokens. Native ETH is represented with Baal ETH sentinel.',
+  };
 }
 
 export async function proposalLifecycle(input: {
@@ -233,7 +262,7 @@ function publicClient(config: Config) {
 async function safeAddressForDao(service: ServiceClient, dao: `0x${string}`): Promise<`0x${string}`> {
   const indexed = await service.dao({ dao });
   if (isRecord(indexed) && isRecord(indexed.dao) && typeof indexed.dao.safeAddress === 'string') {
-    return indexed.dao.safeAddress.toLowerCase() as `0x${string}`;
+    return getAddress(indexed.dao.safeAddress);
   }
   throw new Error('Could not resolve DAO Safe address from indexed DAO data. Pass --address 0xSAFE.');
 }
@@ -242,6 +271,18 @@ function explorerBaseUrl(chainId: number): string {
   if (chainId === 8453) return 'https://basescan.org';
   if (chainId === 1) return 'https://etherscan.io';
   return 'https://basescan.org';
+}
+
+async function safeBalances(chainId: number, safeAddress: `0x${string}`): Promise<SafeBalance[]> {
+  const response = await fetch(`${safeApiBaseUrl(chainId)}/api/v1/safes/${safeAddress}/balances/?trusted=false`);
+  if (!response.ok) throw new Error(`Safe balances request failed: ${response.status}`);
+  return await response.json() as SafeBalance[];
+}
+
+function safeApiBaseUrl(chainId: number): string {
+  if (chainId === 8453) return 'https://safe-transaction-base.safe.global';
+  if (chainId === 1) return 'https://safe-transaction-mainnet.safe.global';
+  throw new Error(`Safe balance lookup is not configured for chainId ${chainId}.`);
 }
 
 async function chainProposalContext(config: Config, dao: `0x${string}`, proposal: IndexedProposal): Promise<Record<string, unknown>> {
@@ -471,4 +512,14 @@ type IndexedProposal = Record<string, unknown> & {
     totalShares?: string;
     quorumPercent?: string;
   };
+};
+
+type SafeBalance = {
+  tokenAddress: `0x${string}` | null;
+  token?: {
+    name?: string;
+    symbol?: string;
+    decimals?: number;
+  } | null;
+  balance: string;
 };
