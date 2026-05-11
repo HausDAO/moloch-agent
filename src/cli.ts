@@ -40,6 +40,7 @@ import {
   type BuiltTx,
   type CustomProposalAction,
   type GovernanceSettingsParams,
+  type SendOptions,
   type SummonParams,
 } from './tx.js';
 
@@ -50,6 +51,7 @@ async function main() {
   const compact = Boolean(parsed.flags.compact);
   const full = Boolean(parsed.flags.full);
   const send = !parsed.flags['build-only'] && process.env.MOLOCH_SEND_DEFAULT !== 'false';
+  const sendOptions = sendOptionsFromFlags(parsed.flags);
 
   let output: unknown;
 
@@ -190,11 +192,11 @@ async function main() {
       output = await maybeSend(config, attachWorkspace(buildSummonTx({
         chainId: config.chainId,
         params: await summonParamsWithWorkspace(config, service, readJsonFile(requiredFlag(parsed.flags, 'params')) as SummonParams, Boolean(parsed.flags['no-workspace'])),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
 
     case 'vote':
-      output = await voteWithOptionalReason(config, service, parsed.flags, send);
+      output = await voteWithOptionalReason(config, service, parsed.flags, send, sendOptions);
       break;
 
     case 'sponsor':
@@ -202,7 +204,7 @@ async function main() {
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         proposal: asProposalId(requiredFlag(parsed.flags, 'proposal')),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'cancel':
@@ -210,7 +212,7 @@ async function main() {
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         proposal: asProposalId(requiredFlag(parsed.flags, 'proposal')),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'process':
@@ -220,7 +222,7 @@ async function main() {
         proposal: asProposalId(requiredFlag(parsed.flags, 'proposal')),
         proposalData: asHex(requiredFlag(parsed.flags, 'proposal-data')),
         gasLimit: optionalBigint(parsed.flags, 'gas-limit') || optionalBigint(parsed.flags, 'process-gas-limit'),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'process-ready':
@@ -230,7 +232,7 @@ async function main() {
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         first: numberFlag(parsed.flags, 'first', 100),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'wrap-eth':
@@ -239,7 +241,7 @@ async function main() {
         chainId: config.chainId,
         weth: optionalAddress(parsed.flags, 'weth') || BASE_WETH,
         amount: parseNativeTokenAmount(requiredFlag(parsed.flags, 'amount')),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'unwrap-eth':
@@ -248,7 +250,7 @@ async function main() {
         chainId: config.chainId,
         weth: optionalAddress(parsed.flags, 'weth') || BASE_WETH,
         amount: parseNativeTokenAmount(requiredFlag(parsed.flags, 'amount')),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'approve-token':
@@ -258,7 +260,7 @@ async function main() {
         token: optionalAddress(parsed.flags, 'token') || BASE_WETH,
         spender: optionalAddress(parsed.flags, 'spender'),
         amount: parseApprovalAmount(parsed.flags),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'ragequit':
@@ -271,7 +273,7 @@ async function main() {
         sharesToBurn: optionalBigint(parsed.flags, 'shares-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'shares', '0') || '0'),
         lootToBurn: optionalBigint(parsed.flags, 'loot-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'loot', '0') || '0'),
         tokens: parseRagequitTokens(requiredFlag(parsed.flags, 'tokens')),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'memory-post':
@@ -294,7 +296,7 @@ async function main() {
         agent: stringFlag(parsed.flags, 'agent'),
         version: stringFlag(parsed.flags, 'version'),
         tag: stringFlag(parsed.flags, 'tag'),
-      }), send);
+      }), send, sendOptions);
       break;
 
     case 'signal':
@@ -309,7 +311,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -331,7 +333,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -346,7 +348,7 @@ async function main() {
         dao,
         params,
         link: await proposalLink(config, service, parsed.flags, 'UPDATE_GOV_SETTINGS'),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -364,7 +366,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -383,7 +385,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -406,7 +408,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -426,7 +428,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -444,7 +446,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -462,7 +464,7 @@ async function main() {
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
         proposalOffering: await proposalOffering(config, dao, parsed.flags),
-      }), latestWorkspace), send);
+      }), latestWorkspace), send, sendOptions);
       break;
       }
 
@@ -604,6 +606,7 @@ async function voteWithOptionalReason(
   service: ServiceClient,
   flags: Record<string, string | boolean>,
   send: boolean,
+  sendOptions: SendOptions,
 ): Promise<unknown> {
   const dao = asAddress(requiredFlag(flags, 'dao'));
   const proposal = asProposalId(requiredFlag(flags, 'proposal'));
@@ -616,7 +619,7 @@ async function voteWithOptionalReason(
     approved,
   });
 
-  if (!reason) return maybeSend(config, voteTx, send);
+  if (!reason) return maybeSend(config, voteTx, send, sendOptions);
 
   const workspaceURI = stringFlag(flags, 'workspace-uri') || await proposalContentURI(service, dao, proposal);
   const reasonTx = buildMemoryPostTx({
@@ -633,12 +636,23 @@ async function voteWithOptionalReason(
     agent: stringFlag(flags, 'agent'),
   });
 
-  const reasonResult = await maybeSend(config, reasonTx, send);
-  const voteResult = await maybeSend(config, voteTx, send);
+  const reasonResult = await maybeSend(config, reasonTx, send, sendOptions);
+  const voteResult = await maybeSend(config, voteTx, send, sendOptions);
   return {
     action: 'vote-with-reason',
     reason: reasonResult,
     vote: voteResult,
+  };
+}
+
+function sendOptionsFromFlags(flags: Record<string, string | boolean>): SendOptions {
+  if (flags.wait && flags['no-wait']) throw new Error('Use either --wait or --no-wait, not both.');
+  const confirmations = numberFlag(flags, 'confirmations', 1);
+  if (confirmations < 1) throw new Error('--confirmations must be a positive integer');
+  if (flags['no-wait'] && confirmations !== 1) throw new Error('--confirmations requires waiting; remove --no-wait.');
+  return {
+    wait: flags['no-wait'] ? false : flags.wait ? true : undefined,
+    confirmations,
   };
 }
 

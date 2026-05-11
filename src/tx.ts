@@ -999,7 +999,12 @@ function toBigint(value: string | number | bigint | undefined): bigint {
   return BigInt(value);
 }
 
-export async function maybeSend(config: Config, built: BuiltTx, send: boolean, options: { wait?: boolean } = {}): Promise<BuiltTx | SendResult> {
+export type SendOptions = {
+  wait?: boolean;
+  confirmations?: number;
+};
+
+export async function maybeSend(config: Config, built: BuiltTx, send: boolean, options: SendOptions = {}): Promise<BuiltTx | SendResult> {
   if (!send) return built;
   if (!config.rpcUrl) throw new Error('RPC_URL is required for --send.');
   if (!config.privateKey) throw new Error('PRIVATE_KEY is required for --send.');
@@ -1019,7 +1024,7 @@ export async function maybeSend(config: Config, built: BuiltTx, send: boolean, o
   const hash = await walletClient.sendTransaction(request);
   const result: SendResult & { receipt?: unknown } = { ...built, sent: true, hash };
   if (options.wait ?? process.env.MOLOCH_WAIT_DEFAULT !== 'false') {
-    result.receipt = await publicClient.waitForTransactionReceipt({ hash });
+    result.receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: options.confirmations });
   }
   return result;
 }

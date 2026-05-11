@@ -50,7 +50,7 @@ Environment:
   RPC_URL             Defaults to https://mainnet.base.org; use Alchemy/Infura/etc. for always-on agents
   PRIVATE_KEY         Required for transaction commands unless --build-only is passed
   MOLOCH_SEND_DEFAULT Set false to build unsigned transactions by default
-  MOLOCH_WAIT_DEFAULT Set false to return immediately after broadcasting instead of waiting for receipt
+  MOLOCH_WAIT_DEFAULT Fallback wait default; prefer --wait, --no-wait, or --confirmations
   IPFS_GATEWAY_URL    When set, auto-created proposal links use gateway URLs instead of ipfs:// URIs
 
 Notes:
@@ -58,7 +58,7 @@ Notes:
   The hosted service handles Graph reads and Pinata uploads.
   The service never receives private keys.
   Transaction commands broadcast by default. Use --build-only for unsigned transaction JSON.
-  Transaction commands wait for receipts by default to reduce stale nonce races between back-to-back actions.
+  Transaction commands wait for receipts by default to reduce stale nonce races between back-to-back actions. Use --confirmations N to wait longer, or --no-wait for fire-and-forget.
   The default public Base RPC is best-effort and can rate limit; set RPC_URL for reliable autonomous operation.
   Transaction commands print summaries by default; use --full for calldata.
   vote --reason posts a vote-reason memory record, then submits the vote.
