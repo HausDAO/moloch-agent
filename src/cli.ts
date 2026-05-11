@@ -242,22 +242,27 @@ async function main() {
       break;
 
     case 'signal':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildSignalTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         title: requiredFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description', '') || '',
         link: await proposalLink(config, service, parsed.flags, 'SIGNAL'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-        proposalOffering: optionalBigint(parsed.flags, 'value'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'dao-meta':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildDaoMetaTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         title: stringFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description'),
         link: await proposalLink(config, service, parsed.flags, 'UPDATE_METADATA_SETTINGS'),
@@ -269,24 +274,32 @@ async function main() {
         web: stringFlag(parsed.flags, 'web'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-        proposalOffering: optionalBigint(parsed.flags, 'value'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'gov-settings':
     case 'governance-settings':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
+      const params = readJsonFile(requiredFlag(parsed.flags, 'params')) as GovernanceSettingsParams;
+      if (params.value == null) params.value = await proposalOffering(config, dao, parsed.flags);
       output = await maybeSend(config, attachWorkspace(buildGovernanceSettingsTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
-        params: readJsonFile(requiredFlag(parsed.flags, 'params')) as GovernanceSettingsParams,
+        dao,
+        params,
         link: await proposalLink(config, service, parsed.flags, 'UPDATE_GOV_SETTINGS'),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'token-settings':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildTokenSettingsTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         pauseShares: parseBool(requiredFlag(parsed.flags, 'pause-shares')),
         pauseLoot: parseBool(requiredFlag(parsed.flags, 'pause-loot')),
         title: stringFlag(parsed.flags, 'title'),
@@ -294,15 +307,18 @@ async function main() {
         link: await proposalLink(config, service, parsed.flags, 'TOKEN_SETTINGS'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-        proposalOffering: optionalBigint(parsed.flags, 'value'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'custom-proposal':
     case 'custom':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildCustomProposalTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         title: requiredFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description'),
         link: await proposalLink(config, service, parsed.flags, stringFlag(parsed.flags, 'proposal-type', 'CUSTOM') || 'CUSTOM'),
@@ -310,34 +326,41 @@ async function main() {
         actions: readJsonFile(requiredFlag(parsed.flags, 'actions')) as CustomProposalAction[],
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-        proposalOffering: optionalBigint(parsed.flags, 'value'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'tribute':
     case 'join-dao':
     case 'swap':
     case 'token-swap':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildTributeTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         title: stringFlag(parsed.flags, 'title'),
         description: stringFlag(parsed.flags, 'description'),
         link: await proposalLink(config, service, parsed.flags, 'TOKENS_FOR_SHARES'),
-        token: stringFlag(parsed.flags, 'token', 'ETH'),
+        token: requiredFlag(parsed.flags, 'token'),
         amount: parseTributeAmount(parsed.flags),
         shares: optionalBigint(parsed.flags, 'shares-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'shares', '0') || '0'),
         loot: optionalBigint(parsed.flags, 'loot-raw') || parseBaalTokenUnits(stringFlag(parsed.flags, 'loot', '0') || '0'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'payment':
     case 'pay':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildPaymentTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         recipient: asAddress(requiredFlag(parsed.flags, 'recipient')),
         token: optionalAddress(parsed.flags, 'token'),
         amount: parsePaymentAmount(parsed.flags),
@@ -346,14 +369,17 @@ async function main() {
         link: await proposalLink(config, service, parsed.flags, optionalAddress(parsed.flags, 'token') ? 'TRANSFER_ERC20' : 'TRANSFER_NETWORK_TOKEN'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-        proposalOffering: optionalBigint(parsed.flags, 'value'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'mint-shares':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildMintSharesTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         recipients: listFlag(requiredFlag(parsed.flags, 'to')).map(asAddress),
         amounts: parseAmountList(parsed.flags),
         title: stringFlag(parsed.flags, 'title'),
@@ -361,14 +387,17 @@ async function main() {
         link: await proposalLink(config, service, parsed.flags, 'MINT_SHARES'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-        proposalOffering: optionalBigint(parsed.flags, 'value'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     case 'mint-loot':
+      {
+      const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildMintLootTx({
         chainId: config.chainId,
-        dao: asAddress(requiredFlag(parsed.flags, 'dao')),
+        dao,
         recipients: listFlag(requiredFlag(parsed.flags, 'to')).map(asAddress),
         amounts: parseAmountList(parsed.flags),
         title: stringFlag(parsed.flags, 'title'),
@@ -376,9 +405,10 @@ async function main() {
         link: await proposalLink(config, service, parsed.flags, 'ISSUE'),
         expiration: numberFlag(parsed.flags, 'expiration', 0),
         baalGas: optionalBigint(parsed.flags, 'baal-gas'),
-        proposalOffering: optionalBigint(parsed.flags, 'value'),
+        proposalOffering: await proposalOffering(config, dao, parsed.flags),
       }), latestWorkspace), send);
       break;
+      }
 
     default:
       throw new Error(`Unknown command: ${parsed.command}\n\n${helpText}`);
@@ -631,6 +661,14 @@ function optionalBigint(flags: Record<string, string | boolean>, name: string): 
   return value == null ? undefined : parseBigint(value);
 }
 
+async function proposalOffering(config: Config, dao: `0x${string}`, flags: Record<string, string | boolean>): Promise<bigint> {
+  const explicit = optionalBigint(flags, 'proposal-offering') ?? optionalBigint(flags, 'value');
+  if (explicit != null) return explicit;
+  const daoState = await readDaoDirect(config, dao);
+  const offering = daoState.proposalOffering;
+  return typeof offering === 'string' ? parseBigint(offering) : 0n;
+}
+
 function optionalAddress(flags: Record<string, string | boolean>, name: string): `0x${string}` | undefined {
   const value = stringFlag(flags, name);
   return value == null ? undefined : asAddress(value);
@@ -652,7 +690,10 @@ function parseTributeAmount(flags: Record<string, string | boolean>): bigint {
   if (raw) return parseBigint(raw);
   const amount = stringFlag(flags, 'amount', '0') || '0';
   const token = stringFlag(flags, 'token', 'ETH') || 'ETH';
-  return /^ETH$/i.test(token) ? parseNativeTokenAmount(amount) : parseBigint(amount);
+  if (/^(ETH|NATIVE)$/i.test(token)) {
+    throw new Error('Tribute/swap proposals require an ERC-20 --token address. Native ETH tribute is not supported by the DAOhaus Tribute Minion.');
+  }
+  return parseBigint(amount);
 }
 
 function parsePaymentAmount(flags: Record<string, string | boolean>): bigint {

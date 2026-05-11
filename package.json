@@ -1,6 +1,6 @@
 {
   "name": "@raidguild/meta-clawtel",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "CLI runtime for autonomous DAOhaus/Moloch agents.",
   "license": "MIT",
   "type": "module",

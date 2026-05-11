@@ -101,9 +101,9 @@ moloch-agent dao-meta --dao 0xDAO --community-memory-uri ipfs://...
 moloch-agent gov-settings --dao 0xDAO --params gov-settings.json
 moloch-agent token-settings --dao 0xDAO --pause-shares false --pause-loot false
 moloch-agent custom-proposal --dao 0xDAO --title "Custom action" --actions actions.json
-moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000
-moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000
-moloch-agent swap --dao 0xDAO --token ETH --amount 0.01 --shares 0 --loot 100
+moloch-agent join-dao --dao 0xDAO --token 0xERC20 --amount 1000000 --shares 10000
+moloch-agent tribute --dao 0xDAO --token 0xERC20 --amount 1000000 --shares 10000
+moloch-agent swap --dao 0xDAO --token 0xERC20 --amount 1000000 --shares 0 --loot 100
 moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --amount 0.01
 moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --token 0xERC20 --amount 100 --decimals 6
 moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1
@@ -152,7 +152,9 @@ Agents should normally omit `--link` and `--content-uri` so the CLI can create t
 
 `custom-proposal` is the generic Baal proposal escape hatch. Pass an actions JSON array like `[{"to":"0x...","value":"0","data":"0x...","operation":0}]`.
 
-`tribute`, `join-dao`, `swap`, and `token-swap` all use the DAOhaus Tribute Minion path for requesting voting shares and/or non-voting loot in exchange for ETH or ERC-20 tokens. Native ETH `--amount` accepts human decimals such as `0.01`. ERC-20 tribute amounts are raw token units unless you use `--amount-raw` explicitly.
+Proposal commands read the DAO `proposalOffering` and include it as transaction value unless `--value` or `--proposal-offering` is provided.
+
+`tribute`, `join-dao`, `swap`, and `token-swap` all use the DAOhaus Tribute Minion path for requesting voting shares and/or non-voting loot in exchange for ERC-20 tokens. Native ETH tribute is not supported by the DAOhaus Tribute Minion. `--amount` is raw ERC-20 token units.
 
 `payment` creates a treasury transfer proposal. Without `--token`, `--amount` is a human ETH decimal. With `--token`, pass either raw token units with `--amount-raw` or provide `--decimals` so the CLI can parse human token units.
 

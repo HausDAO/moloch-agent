@@ -102,17 +102,30 @@ test('buildDaoMetaTx creates metadata proposal', () => {
   assert.equal(built.summary.recordTable, 'daoProfile');
 });
 
-test('buildTributeTx creates native ETH tribute transaction', () => {
+test('buildTributeTx creates ERC-20 tribute transaction with separate proposal offering', () => {
   const built = buildTributeTx({
     chainId: 8453,
     dao,
+    token: '0x0000000000000000000000000000000000000002',
     amount: 10n,
     shares: parseBaalTokenUnits('10000'),
+    proposalOffering: 3n,
   });
 
   assert.equal(built.tx.to, '0x00768B047f73D88b6e9c14bcA97221d6E179d468');
-  assert.equal(built.tx.value, '10');
+  assert.equal(built.tx.value, '3');
   assert.equal(built.summary.proposalKind, 'TOKENS_FOR_SHARES');
+  assert.equal(built.summary.amount, '10');
+  assert.equal(built.summary.proposalOffering, '3');
+});
+
+test('buildTributeTx rejects native ETH tribute', () => {
+  assert.throws(() => buildTributeTx({
+    chainId: 8453,
+    dao,
+    token: 'ETH',
+    amount: 10n,
+  }), /Native ETH tribute is not supported/);
 });
 
 test('parseNativeTokenAmount accepts decimal ETH amounts', () => {

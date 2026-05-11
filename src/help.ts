@@ -27,9 +27,9 @@ Usage:
   moloch-agent gov-settings --dao 0xDAO --params gov-settings.json [--build-only]
   moloch-agent token-settings --dao 0xDAO --pause-shares false --pause-loot false [--build-only]
   moloch-agent custom-proposal --dao 0xDAO --title "..." --actions actions.json [--build-only]
-  moloch-agent join-dao --dao 0xDAO --amount 0.01 --shares 10000 [--build-only]
-  moloch-agent tribute --dao 0xDAO --token ETH --amount 0.01 --shares 10000 [--build-only]
-  moloch-agent swap --dao 0xDAO --token ETH --amount 0.01 --shares 0 --loot 100 [--build-only]
+  moloch-agent join-dao --dao 0xDAO --token 0xERC20 --amount 1000000 --shares 10000 [--build-only]
+  moloch-agent tribute --dao 0xDAO --token 0xERC20 --amount 1000000 --shares 10000 [--build-only]
+  moloch-agent swap --dao 0xDAO --token 0xERC20 --amount 1000000 --shares 0 --loot 100 [--build-only]
   moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --amount 0.01 [--build-only]
   moloch-agent payment --dao 0xDAO --recipient 0xPAYEE --token 0xERC20 --amount 100 --decimals 6 [--build-only]
   moloch-agent mint-shares --dao 0xDAO --to 0xMEMBER --amount 1 [--build-only]
@@ -62,8 +62,9 @@ Notes:
   gov-settings reads JSON with votingPeriodInSeconds, gracePeriodInSeconds, newOffering, quorum, sponsorThreshold, and minRetention.
   token-settings calls Baal setAdminConfig for share/loot pause state.
   custom-proposal reads an actions JSON array: [{ "to": "0x...", "value": "0", "data": "0x...", "operation": 0 }].
-  tribute/join/swap creates a Tribute Minion token-swap proposal for shares and/or loot.
-  tribute/join/swap --amount is a human ETH decimal by default; ERC-20 token amounts are raw units unless --amount-raw is used.
+  Proposal commands read the DAO proposalOffering and include it as tx value unless --value/--proposal-offering is provided.
+  tribute/join/swap creates a Tribute Minion ERC-20 token-swap proposal for shares and/or loot.
+  tribute/join/swap --amount is raw ERC-20 token units. Native ETH tribute is not supported by the DAOhaus Tribute Minion.
   payment sends ETH from the DAO treasury with decimal ETH; ERC-20 payment requires --amount-raw or --decimals.
   mint-shares and mint-loot use human 18-decimal DAO token units by default.
   process-queue never trusts indexed passed=true as the execution gate; RPC state is used when available.

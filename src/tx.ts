@@ -385,15 +385,19 @@ export function buildTributeTx(input: {
   loot?: bigint;
   expiration?: number;
   baalGas?: bigint;
+  proposalOffering?: bigint;
 }): BuiltTx {
   const title = input.title || 'Tribute for DAO tokens';
   const description = input.description || '';
   const link = input.link || '';
   const token = normalizeToken(input.token || 'ETH');
+  if (token === ZERO_ADDRESS) {
+    throw new Error('Tribute/swap proposals require an ERC-20 token address. Native ETH tribute is not supported by the DAOhaus Tribute Minion.');
+  }
   const amount = input.amount || 0n;
   const shares = input.shares || 0n;
   const loot = input.loot || 0n;
-  const value = token === ZERO_ADDRESS ? amount : 0n;
+  const value = input.proposalOffering || 0n;
   const data = encodeFunctionData({
     abi: TRIBUTE_MINION_ABI,
     functionName: 'submitTributeProposal',
@@ -408,9 +412,8 @@ export function buildTributeTx(input: {
     amount: amount.toString(),
     shares: shares.toString(),
     loot: loot.toString(),
-    note: token === ZERO_ADDRESS
-      ? 'Native ETH tribute. Transaction value equals amount. Shares/loot use 18-decimal base units.'
-      : 'ERC-20 tribute. Approve the Tribute Minion first if allowance is insufficient. Shares/loot use 18-decimal base units.',
+    proposalOffering: value.toString(),
+    note: 'ERC-20 tribute. Transaction value is the DAO proposal offering only. Approve the Tribute Minion first if allowance is insufficient. Shares/loot use 18-decimal base units.',
   });
 }
 
