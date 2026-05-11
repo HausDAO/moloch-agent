@@ -10,6 +10,8 @@ import {
   asAddress,
   asHex,
   asProposalId,
+  BASE_WETH,
+  buildApproveTokenTx,
   buildCancelTx,
   buildCustomProposalTx,
   buildDaoMetaTx,
@@ -24,7 +26,9 @@ import {
   buildSummonTx,
   buildTokenSettingsTx,
   buildTributeTx,
+  buildUnwrapEthTx,
   buildVoteTx,
+  buildWrapEthTx,
   maybeSend,
   parseBaalTokenUnits,
   parseBigint,
@@ -215,6 +219,34 @@ async function main() {
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
         first: numberFlag(parsed.flags, 'first', 100),
+      }), send);
+      break;
+
+    case 'wrap-eth':
+    case 'wrap-weth':
+      output = await maybeSend(config, buildWrapEthTx({
+        chainId: config.chainId,
+        weth: optionalAddress(parsed.flags, 'weth') || BASE_WETH,
+        amount: parseNativeTokenAmount(requiredFlag(parsed.flags, 'amount')),
+      }), send);
+      break;
+
+    case 'unwrap-eth':
+    case 'unwrap-weth':
+      output = await maybeSend(config, buildUnwrapEthTx({
+        chainId: config.chainId,
+        weth: optionalAddress(parsed.flags, 'weth') || BASE_WETH,
+        amount: parseNativeTokenAmount(requiredFlag(parsed.flags, 'amount')),
+      }), send);
+      break;
+
+    case 'approve-token':
+    case 'approve':
+      output = await maybeSend(config, buildApproveTokenTx({
+        chainId: config.chainId,
+        token: optionalAddress(parsed.flags, 'token') || BASE_WETH,
+        spender: optionalAddress(parsed.flags, 'spender'),
+        amount: parseApprovalAmount(parsed.flags),
       }), send);
       break;
 
@@ -706,6 +738,15 @@ function parsePaymentAmount(flags: Record<string, string | boolean>): bigint {
     throw new Error('ERC-20 payment proposals require --amount-raw or --decimals because token decimals vary.');
   }
   return parseTokenUnits(amount, Number(decimals));
+}
+
+function parseApprovalAmount(flags: Record<string, string | boolean>): bigint {
+  if (flags.max) return (1n << 256n) - 1n;
+  const raw = stringFlag(flags, 'amount-raw');
+  if (raw) return parseBigint(raw);
+  const amount = requiredFlag(flags, 'amount');
+  const decimals = stringFlag(flags, 'decimals');
+  return decimals ? parseTokenUnits(amount, Number(decimals)) : parseNativeTokenAmount(amount);
 }
 
 function summarizeOutput(value: unknown): unknown {

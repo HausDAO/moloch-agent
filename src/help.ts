@@ -15,6 +15,8 @@ Usage:
   moloch-agent read-proposal --dao 0xDAO --proposal 1
   moloch-agent proposal-lifecycle --dao 0xDAO --proposal 1
   moloch-agent process-queue --dao 0xDAO [--first 100]
+  moloch-agent wrap-eth --amount 0.01 [--build-only]
+  moloch-agent approve-token --token 0xERC20 --amount 1000000 --spender 0xSPENDER [--build-only]
   moloch-agent members --dao 0xDAO [--first 100] [--skip 0]
   moloch-agent records --dao 0xDAO [--table communityMemory] [--first 100] [--skip 0]
   moloch-agent pin-json --file artifact.json [--name artifact-name]
@@ -65,6 +67,8 @@ Notes:
   Proposal commands read the DAO proposalOffering and include it as tx value unless --value/--proposal-offering is provided.
   tribute/join/swap creates a Tribute Minion ERC-20 token-swap proposal for shares and/or loot.
   tribute/join/swap --amount is raw ERC-20 token units. Native ETH tribute is not supported by the DAOhaus Tribute Minion.
+  For native ETH-to-shares flows, wrap ETH to Base WETH, approve Tribute Minion, then use tribute/join/swap with --token 0x4200000000000000000000000000000000000006.
+  approve-token defaults spender to the DAOhaus Tribute Minion and token to Base WETH. Use --amount-raw or --decimals for non-WETH ERC-20s.
   payment sends ETH from the DAO treasury with decimal ETH; ERC-20 payment requires --amount-raw or --decimals.
   mint-shares and mint-loot use human 18-decimal DAO token units by default.
   process-queue never trusts indexed passed=true as the execution gate; RPC state is used when available.

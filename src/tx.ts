@@ -19,6 +19,7 @@ export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 export const TRIBUTE_MINION = '0x00768B047f73D88b6e9c14bcA97221d6E179d468';
 export const GNOSIS_MULTISEND = '0x998739BFdAAdde7C933B942a68053933098f9EDa';
 export const SUMMONER = '0x97Aaa5be8B38795245f1c38A883B44cccdfB3E11';
+export const BASE_WETH = '0x4200000000000000000000000000000000000006';
 export const POSTER_TAG_DAO_DB = 'daohaus.proposal.database';
 export const POSTER_TAG_MEMBER_DB = 'daohaus.member.database';
 export const POSTER_TAG_DAO_PROFILE_UPDATE = 'daohaus.shares.daoProfile';
@@ -60,6 +61,15 @@ const TRIBUTE_MINION_ABI = [
 
 const ERC20_TRANSFER_ABI = [
   { type: 'function', name: 'transfer', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }] },
+] as const;
+
+const ERC20_APPROVE_ABI = [
+  { type: 'function', name: 'approve', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }] },
+] as const;
+
+const WETH_ABI = [
+  { type: 'function', name: 'deposit', stateMutability: 'payable', inputs: [], outputs: [] },
+  { type: 'function', name: 'withdraw', stateMutability: 'nonpayable', inputs: [{ name: 'amount', type: 'uint256' }], outputs: [] },
 ] as const;
 
 const SUMMONER_ABI = [
@@ -157,6 +167,40 @@ export type CustomProposalAction = {
   data?: Hex;
   operation?: number;
 };
+
+export function buildWrapEthTx(input: { chainId: number; amount: bigint; weth?: `0x${string}` }): BuiltTx {
+  const weth = input.weth || BASE_WETH;
+  const data = encodeFunctionData({ abi: WETH_ABI, functionName: 'deposit' });
+  return withSummary(tx(input.chainId, weth, data, input.amount), {
+    action: 'wrap-eth',
+    token: weth,
+    amount: input.amount.toString(),
+    note: 'Wraps native ETH into WETH. Use WETH as the ERC-20 token for Tribute Minion swaps.',
+  });
+}
+
+export function buildUnwrapEthTx(input: { chainId: number; amount: bigint; weth?: `0x${string}` }): BuiltTx {
+  const weth = input.weth || BASE_WETH;
+  const data = encodeFunctionData({ abi: WETH_ABI, functionName: 'withdraw', args: [input.amount] });
+  return withSummary(tx(input.chainId, weth, data), {
+    action: 'unwrap-eth',
+    token: weth,
+    amount: input.amount.toString(),
+    note: 'Unwraps WETH back to native ETH.',
+  });
+}
+
+export function buildApproveTokenTx(input: { chainId: number; token: `0x${string}`; spender?: `0x${string}`; amount: bigint }): BuiltTx {
+  const spender = input.spender || TRIBUTE_MINION;
+  const data = encodeFunctionData({ abi: ERC20_APPROVE_ABI, functionName: 'approve', args: [spender, input.amount] });
+  return withSummary(tx(input.chainId, input.token, data), {
+    action: 'approve-token',
+    token: input.token,
+    spender,
+    amount: input.amount.toString(),
+    note: 'Approves ERC-20 spending. Tribute Minion needs allowance before token-for-shares/loot proposals can be submitted.',
+  });
+}
 
 export function buildVoteTx(input: { chainId: number; dao: `0x${string}`; proposal: number; approved: boolean }): BuiltTx {
   const data = encodeFunctionData({

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCancelTx, buildCustomProposalTx, buildDaoMetaTx, buildGovernanceSettingsTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTokenSettingsTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits, signerAccount } from '../src/tx.js';
+import { BASE_WETH, buildApproveTokenTx, buildCancelTx, buildCustomProposalTx, buildDaoMetaTx, buildGovernanceSettingsTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTokenSettingsTx, buildTributeTx, buildUnwrapEthTx, buildVoteTx, buildWrapEthTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits, signerAccount } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
 
@@ -126,6 +126,35 @@ test('buildTributeTx rejects native ETH tribute', () => {
     token: 'ETH',
     amount: 10n,
   }), /Native ETH tribute is not supported/);
+});
+
+test('buildWrapEthTx creates Base WETH deposit transaction', () => {
+  const built = buildWrapEthTx({ chainId: 8453, amount: parseNativeTokenAmount('0.01') });
+
+  assert.equal(built.tx.to, BASE_WETH);
+  assert.equal(built.tx.value, '10000000000000000');
+  assert.equal(built.summary.action, 'wrap-eth');
+});
+
+test('buildUnwrapEthTx creates Base WETH withdraw transaction', () => {
+  const built = buildUnwrapEthTx({ chainId: 8453, amount: parseNativeTokenAmount('0.01') });
+
+  assert.equal(built.tx.to, BASE_WETH);
+  assert.equal(built.tx.value, '0');
+  assert.equal(built.summary.action, 'unwrap-eth');
+});
+
+test('buildApproveTokenTx defaults spender to Tribute Minion', () => {
+  const built = buildApproveTokenTx({
+    chainId: 8453,
+    token: BASE_WETH,
+    amount: parseNativeTokenAmount('0.01'),
+  });
+
+  assert.equal(built.tx.to, BASE_WETH);
+  assert.equal(built.tx.value, '0');
+  assert.equal(built.summary.action, 'approve-token');
+  assert.equal(built.summary.spender, '0x00768B047f73D88b6e9c14bcA97221d6E179d468');
 });
 
 test('parseNativeTokenAmount accepts decimal ETH amounts', () => {
