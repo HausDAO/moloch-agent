@@ -247,14 +247,14 @@ function explorerBaseUrl(chainId: number): string {
 async function chainProposalContext(config: Config, dao: `0x${string}`, proposal: IndexedProposal): Promise<Record<string, unknown>> {
   const client = publicClient(config);
   const id = Number(proposal.proposalId);
-  const prevId = Number(proposal.prevProposalId || 0);
-  const [rawStatus, state, prevState, raw] = await Promise.all([
+  const [rawStatus, state, raw] = await Promise.all([
     client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'getProposalStatus', args: [id] }),
     client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'state', args: [id] }),
-    client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'state', args: [prevId] }),
     client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'proposals', args: [BigInt(id)] }),
   ]);
   const tuple = namedProposalTuple(raw);
+  const prevId = Number(tuple.prevProposalId || proposal.prevProposalId || 0);
+  const prevState = await client.readContract({ address: dao, abi: BAAL_ABI, functionName: 'state', args: [prevId] });
   const baalGas = BigInt(tuple.baalGas || '0');
   return {
     namedStatus: namedProposalStatus(rawStatus),
@@ -316,12 +316,16 @@ function deriveProposalLifecycle(proposal: IndexedProposal, now = Math.floor(Dat
   const graphReady = afterGrace && yes > no && quorum;
   const prevState = typeof chain.prevState === 'number' ? chain.prevState : undefined;
   const state = typeof chain.state === 'number' ? chain.state : undefined;
+  const chainProposal = isRecord(chain.proposal) ? chain.proposal : {};
+  const prevProposalId = String(chainProposal.prevProposalId || proposal.prevProposalId || '');
   const prevStateEligible = prevState == null ? undefined : PREV_PROCESS_ELIGIBLE.has(prevState);
   const stateReady = state == null ? undefined : state === 5;
   const stateDefeated = state == null ? undefined : state === 7;
   const failedQuorum = afterGrace && state == null && !quorum;
   const failedVote = afterGrace && (stateDefeated == null ? yes <= no : stateDefeated);
-  const processableNow = Boolean((stateReady == null ? graphReady : stateReady) && proposal.proposalData && prevStateEligible !== false);
+  const readyByChainOrGraph = stateReady == null ? graphReady : stateReady;
+  const blockedByPreviousProposal = Boolean(readyByChainOrGraph && proposal.proposalData && prevStateEligible === false);
+  const processableNow = Boolean(readyByChainOrGraph && proposal.proposalData && !blockedByPreviousProposal);
 
   let status = 'unknown';
   if (needsSponsor) status = 'unsponsored';
@@ -332,6 +336,7 @@ function deriveProposalLifecycle(proposal: IndexedProposal, now = Math.floor(Dat
   else if (inVoting) status = 'voting';
   else if (inGrace) status = 'grace';
   else if (processableNow) status = 'needsProcessing';
+  else if (blockedByPreviousProposal) status = 'blockedByPreviousProposal';
   else if (stateDefeated || failedQuorum || failedVote) status = 'failed';
 
   return {
@@ -344,6 +349,7 @@ function deriveProposalLifecycle(proposal: IndexedProposal, now = Math.floor(Dat
     graphReady,
     chainReady: stateReady,
     processableNow,
+    blockedByPreviousProposal,
     failedQuorum,
     failedVote,
     processed,
@@ -351,7 +357,7 @@ function deriveProposalLifecycle(proposal: IndexedProposal, now = Math.floor(Dat
     actionFailed,
     hasProposalData: Boolean(proposal.proposalData),
     chainState: state == null ? undefined : STATE_NAMES[state] || `unknown-${state}`,
-    prevProposalId: String(proposal.prevProposalId ?? ''),
+    prevProposalId,
     prevState: prevState == null ? undefined : STATE_NAMES[prevState] || `unknown-${prevState}`,
     prevStateEligible,
     processGasLimit: typeof chain.processGasLimit === 'string' ? chain.processGasLimit : undefined,
