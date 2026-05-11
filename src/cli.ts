@@ -263,6 +263,7 @@ async function main() {
 
     case 'ragequit':
     case 'rage-quit':
+      requireRagequitConfirmation(parsed.flags);
       output = await maybeSend(config, buildRagequitTx({
         chainId: config.chainId,
         dao: asAddress(requiredFlag(parsed.flags, 'dao')),
@@ -770,6 +771,11 @@ function parseApprovalAmount(flags: Record<string, string | boolean>): bigint {
   const amount = requiredFlag(flags, 'amount');
   const decimals = stringFlag(flags, 'decimals');
   return decimals ? parseTokenUnits(amount, Number(decimals)) : parseNativeTokenAmount(amount);
+}
+
+function requireRagequitConfirmation(flags: Record<string, string | boolean>): void {
+  if (flags['build-only'] || flags['confirm-ragequit']) return;
+  throw new Error('ragequit burns DAO shares/loot and exits treasury value. Re-run with --confirm-ragequit to broadcast, or --build-only to inspect.');
 }
 
 function parseRagequitTokens(value: string): `0x${string}`[] {
