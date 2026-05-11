@@ -3,6 +3,7 @@ export const helpText = `moloch-agent
 Usage:
   moloch-agent health
   moloch-agent capabilities
+  moloch-agent account
   moloch-agent dao --dao 0xDAO
   moloch-agent proposals --dao 0xDAO [--first 100] [--skip 0]
   moloch-agent proposal --dao 0xDAO --proposal 1
@@ -48,6 +49,7 @@ Environment:
   IPFS_GATEWAY_URL    When set, auto-created proposal links use gateway URLs instead of ipfs:// URIs
 
 Notes:
+  account prints the exact signer address derived from PRIVATE_KEY.
   The hosted service handles Graph reads and Pinata uploads.
   The service never receives private keys.
   Transaction commands broadcast by default. Use --build-only for unsigned transaction JSON.
@@ -67,4 +69,5 @@ Notes:
   process-queue never trusts indexed passed=true as the execution gate; RPC state is used when available.
   process-ready selects the oldest ready proposal and includes a gas limit based on proposal baalGas when available.
   summon uses the Base advanced-token summoner and includes a DAOhaus metadata Poster action.
+  Never expand shortened addresses such as 0x1234...abcd. Use only full addresses from account/env/chain/user input.
 `;

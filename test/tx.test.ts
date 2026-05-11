@@ -1,8 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCancelTx, buildCustomProposalTx, buildDaoMetaTx, buildGovernanceSettingsTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTokenSettingsTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits } from '../src/tx.js';
+import { buildCancelTx, buildCustomProposalTx, buildDaoMetaTx, buildGovernanceSettingsTx, buildMemoryPostTx, buildMintLootTx, buildMintSharesTx, buildPaymentTx, buildSignalTx, buildSponsorTx, buildSummonTx, buildTokenSettingsTx, buildTributeTx, buildVoteTx, parseBaalTokenUnits, parseNativeTokenAmount, parseTokenUnits, signerAccount } from '../src/tx.js';
 
 const dao = '0x0000000000000000000000000000000000000001';
+
+test('signerAccount derives exact account address from private key', () => {
+  const account = signerAccount({
+    serviceUrl: 'https://example.test',
+    chainId: 8453,
+    privateKey: '0x0000000000000000000000000000000000000000000000000000000000000001',
+  });
+
+  assert.equal(account.available, true);
+  assert.equal(account.address, '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf');
+});
 
 test('buildVoteTx creates vote transaction summary', () => {
   const built = buildVoteTx({ chainId: 8453, dao, proposal: 12, approved: true });

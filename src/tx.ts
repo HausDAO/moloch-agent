@@ -120,6 +120,22 @@ export type SummonParams = {
   saltNonce?: string | number | bigint;
 };
 
+export function signerAccount(config: Config): Record<string, unknown> {
+  if (!config.privateKey) {
+    return {
+      available: false,
+      source: 'PRIVATE_KEY',
+      note: 'PRIVATE_KEY is not set.',
+    };
+  }
+  const account = privateKeyToAccount(config.privateKey);
+  return {
+    available: true,
+    source: 'PRIVATE_KEY',
+    address: account.address,
+  };
+}
+
 export type GovernanceSettingsParams = {
   title?: string;
   description?: string;

@@ -77,6 +77,7 @@ npm publish --access public --otp 123456
 ```bash
 moloch-agent health
 moloch-agent capabilities
+moloch-agent account
 moloch-agent dao --dao 0xDAO
 moloch-agent proposals --dao 0xDAO
 moloch-agent proposal --dao 0xDAO --proposal 1
@@ -158,6 +159,8 @@ Agents should normally omit `--link` and `--content-uri` so the CLI can create t
 `mint-shares` creates a direct voting-share issuance proposal. `mint-loot` creates a direct non-voting loot issuance proposal. Both use human 18-decimal DAO token units by default; use `--amount-raw` only for exact base units.
 
 `vote --reason` posts a `vote-reason` memory record linked to the proposal, then submits the vote transaction. The CLI reads the proposal `contentURI` when available and includes it as `workspaceURI` on the memory record.
+
+Use `moloch-agent account` to print the exact signer address derived from `PRIVATE_KEY`. Never expand shortened addresses such as `0x1234...abcd`; use only full addresses from `account`, environment variables, chain reads, or explicit user input.
 
 DAOhaus admin URL helper:
 

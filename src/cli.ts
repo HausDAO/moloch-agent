@@ -30,6 +30,7 @@ import {
   parseBigint,
   parseNativeTokenAmount,
   parseTokenUnits,
+  signerAccount,
   type BuiltTx,
   type CustomProposalAction,
   type GovernanceSettingsParams,
@@ -59,6 +60,11 @@ async function main() {
 
     case 'capabilities':
       output = await service.capabilities();
+      break;
+
+    case 'account':
+    case 'signer':
+      output = signerAccount(config);
       break;
 
     case 'dao':
