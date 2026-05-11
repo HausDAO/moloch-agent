@@ -125,7 +125,16 @@ test('buildTributeTx rejects native ETH tribute', () => {
     dao,
     token: 'ETH',
     amount: 10n,
-  }), /Native ETH tribute is not supported/);
+  }), /Native ETH and 0x0000000000000000000000000000000000000000 tribute are not supported/);
+});
+
+test('buildTributeTx rejects zero-address tribute token', () => {
+  assert.throws(() => buildTributeTx({
+    chainId: 8453,
+    dao,
+    token: '0x0000000000000000000000000000000000000000',
+    amount: 10n,
+  }), /nonzero ERC-20 token address/);
 });
 
 test('buildWrapEthTx creates Base WETH deposit transaction', () => {

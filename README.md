@@ -156,7 +156,7 @@ Agents should normally omit `--link` and `--content-uri` so the CLI can create t
 
 Proposal commands read the DAO `proposalOffering` and include it as transaction value unless `--value` or `--proposal-offering` is provided.
 
-`tribute`, `join-dao`, `swap`, and `token-swap` all use the DAOhaus Tribute Minion path for requesting voting shares and/or non-voting loot in exchange for ERC-20 tokens. Native ETH tribute is not supported by the DAOhaus Tribute Minion. `--amount` is raw ERC-20 token units.
+`tribute`, `join-dao`, `swap`, and `token-swap` all use the DAOhaus Tribute Minion path for requesting voting shares and/or non-voting loot in exchange for ERC-20 tokens. Native ETH and zero-address token tribute are not supported by the DAOhaus Tribute Minion. `--amount` is raw ERC-20 token units.
 
 For native ETH-to-shares flows, use WETH: run `wrap-eth --amount 0.01`, approve the Tribute Minion with `approve-token --token 0x4200000000000000000000000000000000000006 --amount 0.01`, then run `tribute` / `join-dao` / `swap` with that WETH token address. `approve-token` defaults spender to the DAOhaus Tribute Minion and token to Base WETH; pass `--amount-raw` or `--decimals` for non-WETH ERC-20 units.
 

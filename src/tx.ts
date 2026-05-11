@@ -436,7 +436,7 @@ export function buildTributeTx(input: {
   const link = input.link || '';
   const token = normalizeToken(input.token || 'ETH');
   if (token === ZERO_ADDRESS) {
-    throw new Error('Tribute/swap proposals require an ERC-20 token address. Native ETH tribute is not supported by the DAOhaus Tribute Minion.');
+    throw new Error('Tribute/swap proposals require a nonzero ERC-20 token address. Native ETH and 0x0000000000000000000000000000000000000000 tribute are not supported by the DAOhaus Tribute Minion.');
   }
   const amount = input.amount || 0n;
   const shares = input.shares || 0n;

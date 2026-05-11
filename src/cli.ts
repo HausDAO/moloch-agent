@@ -722,8 +722,8 @@ function parseTributeAmount(flags: Record<string, string | boolean>): bigint {
   if (raw) return parseBigint(raw);
   const amount = stringFlag(flags, 'amount', '0') || '0';
   const token = stringFlag(flags, 'token', 'ETH') || 'ETH';
-  if (/^(ETH|NATIVE)$/i.test(token)) {
-    throw new Error('Tribute/swap proposals require an ERC-20 --token address. Native ETH tribute is not supported by the DAOhaus Tribute Minion.');
+  if (/^(ETH|NATIVE)$/i.test(token) || token.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+    throw new Error('Tribute/swap proposals require a nonzero ERC-20 --token address. Native ETH and 0x0000000000000000000000000000000000000000 tribute are not supported by the DAOhaus Tribute Minion.');
   }
   return parseBigint(amount);
 }
