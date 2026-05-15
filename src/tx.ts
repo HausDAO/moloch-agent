@@ -426,7 +426,7 @@ export function buildDaoMetaTx(input: {
     chainId: input.chainId,
     dao: input.dao,
     actions: [{ to: POSTER, value: 0n, data: postData, operation: 0 }],
-    title: input.title || 'Update DAO metadata',
+    title: input.title || 'Update Guild metadata',
     description: input.description || '',
     link: input.link,
     proposalType: 'UPDATE_METADATA_SETTINGS',
@@ -457,7 +457,7 @@ export function buildTributeTx(input: {
   baalGas?: bigint;
   proposalOffering?: bigint;
 }): BuiltTx {
-  const title = input.title || 'Tribute for DAO tokens';
+  const title = input.title || 'Tribute for Guild tokens';
   const description = input.description || '';
   const link = input.link || '';
   const token = normalizeToken(input.token || 'ETH');
@@ -483,7 +483,7 @@ export function buildTributeTx(input: {
     shares: shares.toString(),
     loot: loot.toString(),
     proposalOffering: value.toString(),
-    note: 'ERC-20 tribute. Transaction value is the DAO proposal offering only. Approve the Tribute Minion first if allowance is insufficient. Shares/loot use 18-decimal base units.',
+    note: 'ERC-20 tribute. Transaction value is the Guild proposal offering only. Approve the Tribute Minion first if allowance is insufficient. Shares/loot use 18-decimal base units.',
   });
 }
 

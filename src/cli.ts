@@ -52,10 +52,11 @@ async function main() {
   const full = Boolean(parsed.flags.full);
   const send = !parsed.flags['build-only'] && process.env.MOLOCH_SEND_DEFAULT !== 'false';
   const sendOptions = sendOptionsFromFlags(parsed.flags);
+  const command = normalizeCommand(parsed.command);
 
   let output: unknown;
 
-  switch (parsed.command) {
+  switch (command) {
     case 'help':
     case '--help':
     case '-h':
@@ -76,6 +77,7 @@ async function main() {
       break;
 
     case 'dao':
+    case 'guild':
       output = await service.dao({ dao: requiredFlag(parsed.flags, 'dao') });
       break;
 
@@ -97,6 +99,7 @@ async function main() {
     case 'links':
     case 'admin-url':
     case 'daohaus-url':
+    case 'guild-url':
       output = linksFor(config.chainId, {
         dao: stringFlag(parsed.flags, 'dao'),
         proposal: stringFlag(parsed.flags, 'proposal'),
@@ -106,6 +109,7 @@ async function main() {
       break;
 
     case 'read-dao':
+    case 'read-guild':
       output = await readDaoDirect(config, asAddress(requiredFlag(parsed.flags, 'dao')));
       break;
 
@@ -316,6 +320,7 @@ async function main() {
       }
 
     case 'dao-meta':
+    case 'guild-meta':
       {
       const dao = asAddress(requiredFlag(parsed.flags, 'dao'));
       output = await maybeSend(config, attachWorkspace(buildDaoMetaTx({
@@ -391,6 +396,7 @@ async function main() {
 
     case 'tribute':
     case 'join-dao':
+    case 'join-guild':
     case 'swap':
     case 'token-swap':
       {
@@ -489,15 +495,18 @@ function linksFor(chainId: number, input: { dao?: string; proposal?: string; add
   const dao = input.dao ? asAddress(input.dao) : undefined;
   const address = input.address ? asAddress(input.address) : undefined;
   const tx = input.tx ? asHex(input.tx) : undefined;
-  if (!dao && !address && !tx) throw new Error('Provide --dao, --address, or --tx.');
+  if (!dao && !address && !tx) throw new Error('Provide --guild, --address, or --tx.');
   const adminBase = dao ? `https://admin.daohaus.club/molochv3/0x${chainId.toString(16)}/${dao}` : '';
   const explorerBase = explorerBaseUrl(chainId);
   return {
     chainId,
+    guild: dao || '',
     dao: dao || '',
+    guildUrl: adminBase,
     daoUrl: adminBase,
     proposalsUrl: adminBase ? `${adminBase}/proposals` : '',
     proposalUrl: adminBase && input.proposal ? `${adminBase}/proposal/${input.proposal}` : '',
+    guildExplorerUrl: dao ? `${explorerBase}/address/${dao}` : '',
     daoExplorerUrl: dao ? `${explorerBase}/address/${dao}` : '',
     address: address || '',
     addressExplorerUrl: address ? `${explorerBase}/address/${address}` : '',
@@ -505,6 +514,17 @@ function linksFor(chainId: number, input: { dao?: string; proposal?: string; add
     tx: tx || '',
     txExplorerUrl: tx ? `${explorerBase}/tx/${tx}` : '',
   };
+}
+
+function normalizeCommand(command: string): string {
+  const aliases: Record<string, string> = {
+    guild: 'dao',
+    'read-guild': 'read-dao',
+    'guild-meta': 'dao-meta',
+    'join-guild': 'join-dao',
+    'guild-url': 'daohaus-url',
+  };
+  return aliases[command] || command;
 }
 
 function explorerBaseUrl(chainId: number): string {
@@ -712,8 +732,9 @@ function normalizePinResult(value: unknown): PinResult {
 }
 
 function parseWorkspaceKind(value: string): WorkspaceKind {
+  if (value === 'guild') return 'dao';
   if (value === 'dao' || value === 'proposal') return value;
-  throw new Error('--kind must be dao or proposal.');
+  throw new Error('--kind must be guild, dao, or proposal.');
 }
 
 function slugify(value: string): string {
@@ -789,7 +810,7 @@ function parseApprovalAmount(flags: Record<string, string | boolean>): bigint {
 
 function requireRagequitConfirmation(flags: Record<string, string | boolean>): void {
   if (flags['build-only'] || flags['confirm-ragequit']) return;
-  throw new Error('ragequit burns DAO shares/loot and exits treasury value. Re-run with --confirm-ragequit to broadcast, or --build-only to inspect.');
+  throw new Error('ragequit burns Guild shares/loot and exits treasury value. Re-run with --confirm-ragequit to broadcast, or --build-only to inspect.');
 }
 
 function parseRagequitTokens(value: string): `0x${string}`[] {

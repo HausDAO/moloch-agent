@@ -11,6 +11,13 @@ test('parseArgs parses command, flags, and positionals', () => {
   assert.deepEqual(parsed.positionals, ['extra']);
 });
 
+test('parseArgs aliases --guild to --dao', () => {
+  const parsed = parseArgs(['records', '--guild', '0xabc']);
+
+  assert.equal(parsed.flags.guild, '0xabc');
+  assert.equal(parsed.flags.dao, '0xabc');
+});
+
 test('requiredFlag throws on missing flag', () => {
   assert.throws(() => requiredFlag({}, 'dao'), /Missing required --dao/);
 });

@@ -63,7 +63,7 @@ export async function readBalances(input: {
     safeAddress = await safeAddressForDao(input.service, input.dao);
   }
   const address = input.address || safeAddress;
-  if (!address) throw new Error('Provide --address, or provide --dao for DAO Safe balance lookup.');
+  if (!address) throw new Error('Provide --address, or provide --guild for Guild Safe balance lookup.');
   const wei = await client.getBalance({ address });
   const result: Record<string, unknown> = {
     chainId: input.config.chainId,
@@ -264,7 +264,7 @@ async function safeAddressForDao(service: ServiceClient, dao: `0x${string}`): Pr
   if (isRecord(indexed) && isRecord(indexed.dao) && typeof indexed.dao.safeAddress === 'string') {
     return getAddress(indexed.dao.safeAddress);
   }
-  throw new Error('Could not resolve DAO Safe address from indexed DAO data. Pass --address 0xSAFE.');
+  throw new Error('Could not resolve Guild Safe address from indexed data. Pass --address 0xSAFE.');
 }
 
 function explorerBaseUrl(chainId: number): string {

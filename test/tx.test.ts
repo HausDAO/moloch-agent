@@ -303,8 +303,8 @@ test('buildSummonTx creates advanced token summoner transaction with metadata', 
   const built = buildSummonTx({
     chainId: 8453,
     params: {
-      daoName: 'Example DAO',
-      description: 'Test DAO',
+      daoName: 'Example Guild',
+      description: 'Test Guild',
       memberAddresses: [dao],
       memberShares: ['10000000000000000000000'],
       memberLoot: ['0'],
@@ -325,7 +325,7 @@ test('buildSummonTx creates advanced token summoner transaction with metadata', 
 
   assert.equal(built.tx.to, '0x97Aaa5be8B38795245f1c38A883B44cccdfB3E11');
   assert.equal(built.summary.proposalKind, 'SUMMON');
-  assert.equal(built.summary.daoName, 'Example DAO');
+  assert.equal(built.summary.daoName, 'Example Guild');
   assert.equal(built.summary.metadataIncluded, true);
   assert.equal(built.summary.communityMemoryURI, 'ipfs://memory');
 });

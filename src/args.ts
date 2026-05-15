@@ -27,6 +27,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     i += 1;
   }
 
+  if (flags.guild && !flags.dao) flags.dao = flags.guild;
+
   return { command, flags, positionals };
 }
 
