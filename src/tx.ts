@@ -11,8 +11,8 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { base } from 'viem/chains';
 import type { Config } from './config.js';
+import { transactionChain } from './networks.js';
 
 export const POSTER = '0x000000000000cd17345801aa8147b8D3950260FF';
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -1008,11 +1008,11 @@ export async function maybeSend(config: Config, built: BuiltTx, send: boolean, o
   if (!send) return built;
   if (!config.rpcUrl) throw new Error('RPC_URL is required for --send.');
   if (!config.privateKey) throw new Error('PRIVATE_KEY is required for --send.');
-  if (config.chainId !== 8453) throw new Error('Only Base chainId 8453 is currently supported for --send.');
 
   const account = privateKeyToAccount(config.privateKey);
-  const publicClient = createPublicClient({ chain: base, transport: http(config.rpcUrl) });
-  const walletClient = createWalletClient({ account, chain: base, transport: http(config.rpcUrl) });
+  const chain = transactionChain(config.chainId);
+  const publicClient = createPublicClient({ chain, transport: http(config.rpcUrl) });
+  const walletClient = createWalletClient({ account, chain, transport: http(config.rpcUrl) });
   const request = await publicClient.prepareTransactionRequest({
     account,
     to: built.tx.to,

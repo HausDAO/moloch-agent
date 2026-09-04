@@ -1,6 +1,6 @@
 import { createPublicClient, formatEther, formatUnits, getAddress, http } from 'viem';
-import { base } from 'viem/chains';
 import type { Config } from './config.js';
+import { explorerBaseUrl, safeApiBaseUrl, transactionChain } from './networks.js';
 import type { ServiceClient } from './service.js';
 import { BAAL_ABI, BAAL_ETH_TOKEN, type BuiltTx } from './tx.js';
 import { buildProcessTx } from './tx.js';
@@ -255,8 +255,7 @@ export async function buildOldestReadyProcessTx(input: {
 
 function publicClient(config: Config) {
   if (!config.rpcUrl) throw new Error('RPC_URL is required for direct chain reads.');
-  if (config.chainId !== 8453) throw new Error('Only Base chainId 8453 is currently supported for direct chain reads.');
-  return createPublicClient({ chain: base, transport: http(config.rpcUrl) });
+  return createPublicClient({ chain: transactionChain(config.chainId), transport: http(config.rpcUrl) });
 }
 
 async function safeAddressForDao(service: ServiceClient, dao: `0x${string}`): Promise<`0x${string}`> {
@@ -267,22 +266,10 @@ async function safeAddressForDao(service: ServiceClient, dao: `0x${string}`): Pr
   throw new Error('Could not resolve DAO Safe address from indexed DAO data. Pass --address 0xSAFE.');
 }
 
-function explorerBaseUrl(chainId: number): string {
-  if (chainId === 8453) return 'https://basescan.org';
-  if (chainId === 1) return 'https://etherscan.io';
-  return 'https://basescan.org';
-}
-
 async function safeBalances(chainId: number, safeAddress: `0x${string}`): Promise<SafeBalance[]> {
   const response = await fetch(`${safeApiBaseUrl(chainId)}/api/v1/safes/${safeAddress}/balances/?trusted=false`);
   if (!response.ok) throw new Error(`Safe balances request failed: ${response.status}`);
   return await response.json() as SafeBalance[];
-}
-
-function safeApiBaseUrl(chainId: number): string {
-  if (chainId === 8453) return 'https://safe-transaction-base.safe.global';
-  if (chainId === 1) return 'https://safe-transaction-mainnet.safe.global';
-  throw new Error(`Safe balance lookup is not configured for chainId ${chainId}.`);
 }
 
 async function chainProposalContext(config: Config, dao: `0x${string}`, proposal: IndexedProposal): Promise<Record<string, unknown>> {

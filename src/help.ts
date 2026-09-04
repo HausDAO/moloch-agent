@@ -46,8 +46,8 @@ Usage:
 
 Environment:
   MOLOCH_SERVICE_URL  Defaults to https://moloch-service-production.up.railway.app
-  CHAIN_ID            Defaults to 8453
-  RPC_URL             Defaults to https://mainnet.base.org; use Alchemy/Infura/etc. for always-on agents
+  CHAIN_ID            Defaults to Base 8453; Gnosis 100 is also supported for direct reads and transactions
+  RPC_URL             Defaults by chain; use a dedicated provider for always-on agents
   PRIVATE_KEY         Required for transaction commands unless --build-only is passed
   MOLOCH_SEND_DEFAULT Set false to build unsigned transactions by default
   MOLOCH_WAIT_DEFAULT Fallback wait default; prefer --wait, --no-wait, or --confirmations
@@ -59,7 +59,7 @@ Notes:
   The service never receives private keys.
   Transaction commands broadcast by default. Use --build-only for unsigned transaction JSON.
   Transaction commands wait for receipts by default to reduce stale nonce races between back-to-back actions. Use --confirmations N to wait longer, or --no-wait for fire-and-forget.
-  The default public Base RPC is best-effort and can rate limit; set RPC_URL for reliable autonomous operation.
+  The default public Base and Gnosis RPCs are best-effort and can rate limit; set RPC_URL for reliable autonomous operation.
   Transaction commands print summaries by default; use --full for calldata.
   vote --reason posts a vote-reason memory record, then submits the vote.
   summon auto-pins a DAO workspace when metadata pointers are not provided.

@@ -188,7 +188,8 @@ moloch-agent links --address 0xf58be4395defe88ca261c2d869642c06baccec16
 - The CLI owns local signing commands.
 - The service must never receive private keys.
 - `process-queue` and `process-ready` use direct chain state and do not rely on indexed `passed` as the execution gate.
-- `RPC_URL` defaults to `https://mainnet.base.org` so the CLI works out of the box.
+- `CHAIN_ID` defaults to Base `8453`; Gnosis `100` is supported for direct reads and signed transactions.
+- `RPC_URL` defaults to the public RPC for the selected supported chain (`https://mainnet.base.org` or `https://rpc.gnosischain.com`). Use a dedicated provider for reliable autonomous operation.
 - Always-on agents should set a managed Base RPC URL for reliability.
 
 Transaction commands sign and broadcast by default. Use `--build-only` to build unsigned summaries, and `--full` to print calldata. Signing and broadcasting require `PRIVATE_KEY`; `RPC_URL` is optional but recommended.

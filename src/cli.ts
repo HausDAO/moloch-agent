@@ -3,6 +3,7 @@ import { parseArgs, numberFlag, requiredFlag, stringFlag } from './args.js';
 import { readJsonFile } from './files.js';
 import { helpText } from './help.js';
 import { getConfig, type Config } from './config.js';
+import { explorerBaseUrl } from './networks.js';
 import { createServiceClient, type ServiceClient } from './service.js';
 import { printCompact, printJson } from './output.js';
 import { buildOldestReadyProcessTx, processQueue, proposalLifecycle, readBalances, readDaoDirect, readProposalDirect, readTreasuryTokens } from './chain.js';
@@ -505,12 +506,6 @@ function linksFor(chainId: number, input: { dao?: string; proposal?: string; add
     tx: tx || '',
     txExplorerUrl: tx ? `${explorerBase}/tx/${tx}` : '',
   };
-}
-
-function explorerBaseUrl(chainId: number): string {
-  if (chainId === 8453) return 'https://basescan.org';
-  if (chainId === 1) return 'https://etherscan.io';
-  return `https://basescan.org`;
 }
 
 async function proposalLink(
