@@ -24,6 +24,13 @@ test('getConfig applies overrides', () => {
   assert.equal(config.ipfsGatewayUrl, 'https://gateway.example.test/ipfs/');
 });
 
+test('getConfig uses the Gnosis public RPC when chain 100 is selected', () => {
+  const config = getConfig({ CHAIN_ID: '100' });
+
+  assert.equal(config.chainId, 100);
+  assert.equal(config.rpcUrl, 'https://rpc.gnosischain.com');
+});
+
 test('normalizeServiceUrl strips trailing slash', () => {
   assert.equal(normalizeServiceUrl('https://example.test///'), 'https://example.test');
 });

@@ -33,6 +33,7 @@
     "build": "tsc && chmod +x dist/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx test/*.test.ts",
+    "prepare": "npm run build",
     "prepack": "npm run build"
   },
   "dependencies": {
